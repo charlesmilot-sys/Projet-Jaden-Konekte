@@ -1,0 +1,39 @@
+# Pile de départ Jaden Konekté : broker MQTT + base de séries temporelles.
+# Ajoutez vos propres services (api, ingestion, inference, worker, front…) dans ce fichier.
+#   docker compose up -d
+services:
+  mqtt:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"      # MQTT
+      - "9001:9001"      # MQTT sur WebSocket (navigateur)
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mqtt-data:/mosquitto/data
+
+  db:
+    image: timescale/timescaledb-ha:pg16   # inclut TimescaleDB et pgvector
+    environment:
+      POSTGRES_USER: jaden
+      POSTGRES_PASSWORD: jaden        # développement uniquement
+      POSTGRES_DB: jaden
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - db-data:/home/postgres/pgdata/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jaden"]
+      interval: 5s
+      retries: 10
+
+  simulateur:
+    build: ../simulateur
+    command: ["python", "simulateur_capteurs.py", "--broker", "mqtt",
+              "--exploitation", "expl-1", "--parcelles", "p1", "p2", "p3"]
+    depends_on: [mqtt]
+    profiles: ["simu"]     # docker compose --profile simu up -d
+
+volumes:
+  mqtt-data:
+  db-data:

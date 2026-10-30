@@ -1,0 +1,27 @@
+# Secrets : jamais dans le dépôt (exigence du sujet, §4)
+.env
+*.env
+!.env.exemple
+infra/mosquitto/passwd
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Node
+node_modules/
+
+# IA : données et modèles volumineux (régénérables par les scripts)
+ia/cnn/data/
+ia/cnn/*.pt
+ia/cnn/*.pth
+*.onnx
+
+# Divers
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
