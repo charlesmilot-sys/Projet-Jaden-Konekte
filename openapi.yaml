@@ -118,7 +118,83 @@ paths:
         '422':
           $ref: '#/components/responses/DonneesInvalides'
 
+  /api/v1/jetons:
+    post:
+      summary: Connexion
+      tags: [Authentification]
+      security: []
+      requestBody: 
+        required: true
+        content: 
+          application/json: 
+            schema:
+              type: object
+              required: [courriel, mot_de_passe]
+              properties: 
+                courriel:
+                  type: string
+                  format: email
+                mot_de_passe:
+                  type: string
+                  format: password
+      responses: 
+        '200': 
+          description: connexion réussie, jeton d'accès JWT
+          content: 
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Jeton'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '422':
+          $ref: '#/components/responses/DonneesInvalides'
 
+  /api/v1/utilisateurs:
+    post:
+      summary: Inscription
+      security: []
+      requestBody:
+        required: true
+        content: 
+          application/json:
+            schema: 
+              type: object
+              required: [nom, prenom, courriel, mot_de_passe]
+              properties:
+                nom:
+                  type: string
+                  maxLength: 40
+                prenom:
+                  type: string
+                  maxLength: 40
+                courriel:
+                  type: string
+                  format: email
+                  maxLength: 120
+                mot_de_passe:
+                  type: string
+                  format: password
+                  minLength: 8
+                  writeOnly: true
+      responses:
+        '201':
+          description: inscription reussie
+          content: 
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Utilisateur'
+        
+        '409':
+          $ref: '#/components/responses/Conflit'
+        '422':
+          $ref: '#/components/responses/DonneesInvalides'
+        
+
+
+
+        
+        
+      
 components:
   schemas:
     Parcelle:
@@ -175,6 +251,37 @@ components:
         cree_le:
           type: string
           format: date-time
+
+    Jeton: 
+      type: object
+      required: [access_token, token_type, expires_in]
+      properties: 
+        access_token:
+          type: string
+        token_type:
+          type: string
+          enum: [bearer]
+        expires_in:
+          type: integer
+          example: 3600
+
+    Utilisateur:
+      type: object
+      required: [id, prenom, nom, courriel, role]
+      properties:
+        id:
+          type: integer
+        prenom:
+          type: string
+        nom:
+          type: string
+        courriel:
+          type: string
+          format: email
+        role: 
+          type: string
+          enum: [exploitant, administrateur]
+
 
   responses:
     NonAuthentifie:
