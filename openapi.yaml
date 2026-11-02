@@ -1,0 +1,89 @@
+openapi: 3.1.0
+
+info:
+  title: Jaden Konekté API
+  version: 1.0.0
+  description: Suivi des jardins connectés (capteurs, arrosage, diagnostic, assistant).
+
+servers:
+  - url: http://localhost:8000
+
+paths:
+  /api/v1/parcelles/{id}:
+    get:
+      summary: Détail d'une parcelle
+      tags: [Parcelles]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: La parcelle
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Parcelle'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+
+components:
+  schemas:
+    Parcelle:
+      type: object
+      required: [id, code, nom, culture]
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+          example: p1
+        nom:
+          type: string
+          example: Carré de tomates
+        culture:
+          type: string
+          example: tomate
+        surface_m2:
+          type: number
+
+    Probleme:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+
+  responses:
+    NonAuthentifie:
+      description: Jeton absent, invalide ou expiré
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Probleme'
+    Introuvable:
+      description: Ressource inexistante ou appartenant à un autre exploitant
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Probleme'
+
+  securitySchemes:
+    jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - jwt: []
