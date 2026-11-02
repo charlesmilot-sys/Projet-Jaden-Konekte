@@ -75,6 +75,50 @@ paths:
         '404':
           $ref: '#/components/responses/Introuvable'
 
+  /api/v1/parcelles/{id}/commandes:
+    post:
+      summary: Envoyer un ordre à la vanne
+      tags: [Commandes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: 
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: 
+                  type: string
+                  enum: [ouvrir, fermer]
+                duree_s:
+                  type: integer
+                  minimum: 10
+                  maximum: 3600
+                  default: 600
+      responses:
+        '202':
+          description: Ordre publié, en attende de confirmation de la vanne
+          content: 
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Commande'
+              
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+        '422':
+          $ref: '#/components/responses/DonneesInvalides'
+
+
 components:
   schemas:
     Parcelle:
@@ -108,6 +152,29 @@ components:
           type: integer
         detail:
           type: string
+    
+    Commande:
+      type: object
+      required: [id, action, statut, cree_le]
+      properties:
+        id:
+          type: string
+          example: cmd-42
+        action:
+          type: string
+          enum: [ouvrir, fermer]
+        duree_s:
+          type: integer
+          example: 600
+        origine:
+          type: string
+          enum: [manuelle, regle, agent]
+        statut:
+          type: string
+          enum: [envoyee, confirmee, echec]
+        cree_le:
+          type: string
+          format: date-time
 
   responses:
     NonAuthentifie:
@@ -118,6 +185,19 @@ components:
             $ref: '#/components/schemas/Probleme'
     Introuvable:
       description: Ressource inexistante ou appartenant à un autre exploitant
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Probleme'
+    
+    Conflit:
+      description: Action impossible dans l'état actuel (ex. objet hors ligne, règle déjà existante)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Probleme'
+    DonneesInvalides:
+      description: Valeurs hors de l'intervalle
       content:
         application/problem+json:
           schema:
