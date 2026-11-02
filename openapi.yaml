@@ -152,6 +152,7 @@ paths:
   /api/v1/utilisateurs:
     post:
       summary: Inscription
+      tags: [Authentification]
       security: []
       requestBody:
         required: true
@@ -188,6 +189,74 @@ paths:
           $ref: '#/components/responses/Conflit'
         '422':
           $ref: '#/components/responses/DonneesInvalides'
+
+  /api/v1/utilisateurs/moi:
+    get:
+      summary: Profil de l'utilisateur connecté 
+      tags: [Authentification]
+      responses: 
+        '200': 
+          description: L'utilisateur identifié par le jeton
+          content: 
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Utilisateur'
+        
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+  
+  /api/v1/diagnostics:
+    post:
+      summary: Envoie d'une photo de feuille
+      tags: [Diagnostics]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image: 
+                  type: string
+                  format: binary
+                  description: Photo JPEG ou PNG, 5 Mo max 
+                parcelle:
+                  type: integer
+                  description: Parcelle concernée
+            encoding: 
+              image: 
+                contentType: image/jpeg, image/png
+      responses: 
+        '201':
+          description: Diagnostic réalisé
+          content: 
+            application/json:
+              schema: 
+                $ref: '#/components/schemas/Diagnostic'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '413':
+          description: Image trop volumineuse (plus de 5 Mo)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Probleme'
+        '415':
+          description: Format d'image non pris en charge (JPEG ou PNG attendu)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Probleme'
+        '422':
+          $ref: '#/components/responses/DonneesInvalides'
+
+        
+        
+        
+
         
 
 
@@ -282,6 +351,41 @@ components:
           type: string
           enum: [exploitant, administrateur]
 
+    Diagnostic:
+      type: object
+      required: [id, statut, image_url, cree_le]
+      properties:
+        id: 
+          type: integer
+        parcelle: 
+          type: [integer, 'null']
+        classe: 
+          type: string
+          example: Tomato__late_blight
+        libelle: 
+          type: string
+          description: Nom de la maladie en français
+          example: Mildiou
+        score:
+          type: number
+          minimum: 0
+          maximum: 1
+          example: 0.94
+        modele:
+          type: string
+          example: mobilenetv3-tomate-v1
+        statut:
+          type: string
+          enum: [en_cours, termine, echec]
+        image_url:
+          type: string
+        confirme:
+          type: [boolean, 'null']
+          description: Validation par l'exploitant (null tant qu'il n'a pas répondu)
+        cree_le:
+          type: string
+          format: date-time
+
 
   responses:
     NonAuthentifie:
@@ -290,6 +394,7 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Probleme'
+
     Introuvable:
       description: Ressource inexistante ou appartenant à un autre exploitant
       content:
