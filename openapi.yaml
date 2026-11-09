@@ -11,7 +11,7 @@ servers:
 paths:
   /api/v1/parcelles:
     get:
-      summary: Liste de mes parcelles (paginée)
+      summary: Liste de mes parcelles 
       tags: [Parcelles]
       parameters:
         - name: page
@@ -317,6 +317,188 @@ paths:
           $ref: '#/components/responses/NonAuthentifie'
         '404':
           $ref: '#/components/responses/Introuvable' 
+
+  /api/v1/parcelles/{id}/mesures:
+    get:
+      summary: Historique agrégé d'une grandeur (moyenne, min, max par tranche)
+      tags: [Mesures]
+      description: Seules les mesures valides sont agrégées. Tranches de 1 h sur 24 h, de 6 h sur 7 jours.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: grandeur
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [humidite, temperature, luminosite, intensite]
+        - name: periode
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [24h, 7j]
+            default: 24h
+      responses:
+        '200':
+          description: La série agrégée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SerieMesures'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '422':
+          $ref: '#/components/responses/DonneesInvalides'
+
+  /api/v1/parcelles/{id}/equipements:
+    get:
+      summary: État des équipements de la parcelle (vanne)
+      tags: [Commandes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Les équipements de la parcelle
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Equipement'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+
+  /api/v1/parcelles/{id}/regle:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      summary: Lire la règle d'arrosage de la parcelle
+      tags: [Règles]
+      responses:
+        '200':
+          description: La règle
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Regle'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+    put:
+      summary: Créer ou remplacer la règle d'arrosage
+      tags: [Règles]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegleEntree'
+      responses:
+        '200':
+          description: Règle remplacée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Regle'
+        '201':
+          description: Règle créée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Regle'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '422':
+          $ref: '#/components/responses/DonneesInvalides'
+    patch:
+      summary: Modifier une partie de la règle (seuil, durée, activation…)
+      tags: [Règles]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegleModification'
+      responses:
+        '200':
+          description: Règle modifiée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Regle'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '422':
+          $ref: '#/components/responses/DonneesInvalides'
+
+  /api/v1/questions:
+    post:
+      summary: Poser une question à l'assistant agronome
+      tags: [Assistant]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question:
+                  type: string
+                  minLength: 3
+                  maxLength: 1000
+                  example: Comment reconnaître le mildiou de la tomate ?
+      responses:
+        '200':
+          description: |
+            Réponse en streaming (Server-Sent Events). Trois types d'événements :
+            - `morceau` : `{"texte": "..."}`, un fragment de la réponse, à afficher au fil de l'eau ;
+            - `sources` : `[{"source": "02_tomate_maladies.md", "section": "Mildiou"}]`, les passages utilisés ;
+            - `fin` : `{"hors_fiches": false}`, vaut true si la réponse n'est pas dans les fiches.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              example: |
+                event: morceau
+                data: {"texte": "Le mildiou se reconnaît à "}
+
+                event: sources
+                data: [{"source": "02_tomate_maladies.md", "section": "Mildiou"}]
+
+                event: fin
+                data: {"hors_fiches": false}
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '422':
+          $ref: '#/components/responses/DonneesInvalides'
+        '503':
+          description: Modèle de langage indisponible
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Probleme'
         
 
              
@@ -440,6 +622,183 @@ components:
           description: Validation par l'exploitant (null tant qu'il n'a pas répondu)
         cree_le:
           type: string
+          format: date-time
+
+    SerieMesures:
+      type: object
+      required: [grandeur, unite, periode, intervalle, points]
+      properties:
+        grandeur:
+          type: string
+          enum: [humidite, temperature, luminosite, intensite]
+        unite:
+          type: string
+          example: '%'
+        periode:
+          type: string
+          enum: [24h, 7j]
+        intervalle:
+          type: string
+          description: Taille d'une tranche
+          example: 1 hour
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/PointMesure'
+
+    PointMesure:
+      type: object
+      required: [debut, moyenne, min, max, nombre]
+      properties:
+        debut:
+          type: string
+          format: date-time
+        moyenne:
+          type: number
+        min:
+          type: number
+        max:
+          type: number
+        nombre:
+          type: integer
+          description: Nombre de mesures valides dans la tranche
+
+    Equipement:
+      type: object
+      required: [id, type, etat, en_ligne]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [vanne]
+        etat:
+          type: string
+          enum: [ouverte, fermee]
+        jusqua:
+          type: [string, 'null']
+          format: date-time
+          description: Fermeture prévue si la vanne est ouverte
+        derniere_cmd:
+          type: [string, 'null']
+          example: cmd-42
+        en_ligne:
+          type: boolean
+          description: Dernier statut publié par l'objet (online / offline)
+        maj_le:
+          type: [string, 'null']
+          format: date-time
+
+    Clause:
+      type: object
+      required: [op, valeur]
+      oneOf:
+        - required: [capteur]
+        - required: [meteo]
+      properties:
+        capteur:
+          type: string
+          enum: [sol/humidite, air/temperature, air/luminosite, pluvio/intensite]
+        meteo:
+          type: string
+          enum: [pluie_6h]
+        op:
+          type: string
+          enum: ['<', '<=', '>', '>=']
+        valeur:
+          type: number
+
+    Condition:
+      type: object
+      required: [et]
+      properties:
+        et:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/Clause'
+      example:
+        et:
+          - capteur: sol/humidite
+            op: '<'
+            valeur: 25
+          - meteo: pluie_6h
+            op: '<'
+            valeur: 2
+
+    Action:
+      type: object
+      required: [equipement, action]
+      properties:
+        equipement:
+          type: string
+          enum: [vanne]
+        action:
+          type: string
+          enum: [ouvrir]
+        duree_s:
+          type: integer
+          minimum: 10
+          maximum: 3600
+          default: 600
+
+    RegleEntree:
+      type: object
+      required: [nom, condition, action]
+      properties:
+        nom:
+          type: string
+          maxLength: 80
+        condition:
+          $ref: '#/components/schemas/Condition'
+        action:
+          $ref: '#/components/schemas/Action'
+        active:
+          type: boolean
+          default: true
+        delai_min_s:
+          type: integer
+          minimum: 0
+          default: 7200
+
+    RegleModification:
+      type: object
+      minProperties: 1
+      description: Seuls les champs envoyés sont modifiés
+      properties:
+        nom:
+          type: string
+          maxLength: 80
+        condition:
+          $ref: '#/components/schemas/Condition'
+        action:
+          $ref: '#/components/schemas/Action'
+        active:
+          type: boolean
+        delai_min_s:
+          type: integer
+          minimum: 0
+
+    Regle:
+      type: object
+      required: [id, parcelle, nom, condition, action, active, delai_min_s]
+      properties:
+        id:
+          type: integer
+        parcelle:
+          type: integer
+        nom:
+          type: string
+        condition:
+          $ref: '#/components/schemas/Condition'
+        action:
+          $ref: '#/components/schemas/Action'
+        active:
+          type: boolean
+        delai_min_s:
+          type: integer
+        derniere_execution:
+          type: [string, 'null']
           format: date-time
 
 
