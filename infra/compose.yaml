@@ -33,7 +33,14 @@ services:
               "--exploitation", "expl-1", "--parcelles", "p1", "p2", "p3"]
     depends_on: [mqtt]
     profiles: ["simu"]     # docker compose --profile simu up -d
-
+    
+  api:
+    build: ../api
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
 volumes:
   mqtt-data:
   db-data:
