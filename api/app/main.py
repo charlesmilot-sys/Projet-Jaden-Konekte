@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app import erreurs
 from app.db import pool
-from app.routes import auth, parcelles
+from app.routes import auth, mesures, parcelles
 
 
 @asynccontextmanager
@@ -22,3 +22,4 @@ erreurs.installer(app)
 
 app.include_router(auth.router)
 app.include_router(parcelles.router)
+app.include_router(mesures.router)

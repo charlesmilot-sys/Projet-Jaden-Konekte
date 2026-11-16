@@ -1,5 +1,5 @@
 from typing import Literal
-
+from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -53,3 +53,26 @@ class PageParcelles(BaseModel):
     page: int
     taille: int
     total: int
+
+
+
+# --- Mesures ------------------------------------------------------------------
+
+Grandeur = Literal["humidite", "temperature", "luminosite", "intensite"]
+Periode = Literal["24h", "7j"]
+
+
+class PointMesure(BaseModel):
+    debut: datetime
+    moyenne: float
+    min: float
+    max: float
+    nombre: int = Field(description="Nombre de mesures valides dans la tranche")
+
+
+class SerieMesures(BaseModel):
+    grandeur: Grandeur
+    unite: str = Field(examples=["%"])
+    periode: Periode
+    intervalle: str = Field(examples=["1 hour"])
+    points: list[PointMesure]
