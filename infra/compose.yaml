@@ -44,6 +44,19 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  ingestion:
+    build: ../ingestion
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      MQTT_HOTE: mqtt
+    depends_on:
+      db:
+        condition: service_healthy
+      mqtt:
+        condition: service_started
+    restart: unless-stopped
+    
 volumes:
   mqtt-data:
   db-data:
