@@ -1,0 +1,25 @@
+# Droits par compte MQTT : principe du moindre privilège.
+# Un compte n'a accès qu'aux topics listés ; tout le reste lui est refusé.
+
+# Service d'ingestion : lit tout (mesures, statut, état des vannes), n'écrit rien
+user ingestion
+topic read jaden/#
+
+# API : publie uniquement les commandes de vanne (manuelles)
+user api
+topic write jaden/+/+/vanne/cmd
+
+# Service des règles : publie uniquement les commandes de vanne (automatiques)
+user regles
+topic write jaden/+/+/vanne/cmd
+
+# Simulateur des objets de l'exploitation expl-1 (un seul client pour ses 3 parcelles) :
+# publie mesures, statut et état des vannes de expl-1, écoute ses commandes
+user sim-expl-1
+topic write jaden/expl-1/#
+topic read jaden/expl-1/+/vanne/cmd
+
+# Objet réel (ESP32) d'une parcelle : limité à SA parcelle
+user capteur-p1
+topic write jaden/expl-1/p1/#
+topic read jaden/expl-1/p1/vanne/cmd

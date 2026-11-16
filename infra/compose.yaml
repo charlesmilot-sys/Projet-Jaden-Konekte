@@ -4,11 +4,31 @@
 services:
   mqtt:
     image: eclipse-mosquitto:2
+    environment:
+      MQTT_MDP_INGESTION: ${MQTT_MDP_INGESTION:?à définir dans infra/.env}
+      MQTT_MDP_API: ${MQTT_MDP_API:?à définir dans infra/.env}
+      MQTT_MDP_REGLES: ${MQTT_MDP_REGLES:?à définir dans infra/.env}
+      MQTT_MDP_SIMULATEUR: ${MQTT_MDP_SIMULATEUR:?à définir dans infra/.env}
+    # Au démarrage : crée les comptes (mots de passe hachés), installe l'ACL, puis lance le broker
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        cd /mosquitto/data
+        rm -f passwd; touch passwd; chmod 0700 passwd
+        mosquitto_passwd -b passwd ingestion  "$$MQTT_MDP_INGESTION"
+        mosquitto_passwd -b passwd api        "$$MQTT_MDP_API"
+        mosquitto_passwd -b passwd regles     "$$MQTT_MDP_REGLES"
+        mosquitto_passwd -b passwd sim-expl-1 "$$MQTT_MDP_SIMULATEUR"
+        cp /mosquitto/config/acl acl; chmod 0700 acl
+        chown mosquitto:mosquitto passwd acl
+        exec mosquitto -c /mosquitto/config/mosquitto.conf
     ports:
       - "1883:1883"      # MQTT
       - "9001:9001"      # MQTT sur WebSocket (navigateur)
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/acl:/mosquitto/config/acl:ro
       - mqtt-data:/mosquitto/data
 
   db:
@@ -30,6 +50,7 @@ services:
   simulateur:
     build: ../simulateur
     command: ["python", "simulateur_capteurs.py", "--broker", "mqtt",
+              "--user", "sim-expl-1", "--password", "${MQTT_MDP_SIMULATEUR}",
               "--exploitation", "expl-1", "--parcelles", "p1", "p2", "p3"]
     depends_on: [mqtt]
     profiles: ["simu"]     # docker compose --profile simu up -d
@@ -40,6 +61,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}
       MQTT_HOTE: mqtt
+      MQTT_UTILISATEUR: api
+      MQTT_MOT_DE_PASSE: ${MQTT_MDP_API}
     ports:
       - "8000:8000"
     depends_on:
@@ -53,6 +76,8 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       MQTT_HOTE: mqtt
+      MQTT_UTILISATEUR: ingestion
+      MQTT_MOT_DE_PASSE: ${MQTT_MDP_INGESTION}
     depends_on:
       db:
         condition: service_healthy
@@ -65,6 +90,8 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       MQTT_HOTE: mqtt
+      MQTT_UTILISATEUR: regles
+      MQTT_MOT_DE_PASSE: ${MQTT_MDP_REGLES}
       PERIODE_REGLES_S: "30"
     depends_on:
       db:
