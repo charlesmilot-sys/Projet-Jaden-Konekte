@@ -104,3 +104,19 @@ class Commande(BaseModel):
     origine: Literal["manuelle", "regle", "agent"]
     statut: Literal["envoyee", "confirmee", "echec"]
     cree_le: datetime
+
+
+
+
+# --- Flux temps réel ------------------------------------------------------------
+
+class ValeurCourante(BaseModel):
+    valeur: float
+    unite: str
+    ts: datetime
+
+
+class EtatParcelle(BaseModel):
+    """Ce que le tableau de bord affiche en direct pour une parcelle."""
+    mesures: dict[str, ValeurCourante]   # clé : grandeur (humidite, temperature…)
+    vanne: Equipement | None

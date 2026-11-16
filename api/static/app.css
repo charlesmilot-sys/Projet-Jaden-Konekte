@@ -1,0 +1,133 @@
+/* Jaden Konekté — palette du jardin : feuille, terre, eau */
+:root {
+  --fond: #f2f5ef;          /* feuille pâle */
+  --surface: #ffffff;
+  --encre: #1e2b22;         /* vert très sombre */
+  --discret: #5b6a5f;
+  --trait: #d5ddd2;
+  --eau: #1f6fa8;           /* l'eau : humidité, arrosage */
+  --eau-clair: #d6e8f5;
+  --terre: #8b5e3c;         /* le sol sec */
+  --terre-clair: #efe3d8;
+  --ok: #2f7a3d;
+  --alerte: #b03a26;
+  --rayon: 6px;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--fond);
+  color: var(--encre);
+  font: 1rem/1.5 "Atkinson Hyperlegible", system-ui, sans-serif;
+}
+h1, h2 { line-height: 1.2; margin: 0 0 .75rem; }
+h2 { font-size: 1.125rem; }
+p { margin: 0; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 3px solid var(--eau); outline-offset: 2px; }
+
+button, select, input {
+  font: inherit;
+  border-radius: var(--rayon);
+}
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .5; }
+.bouton-principal { background: var(--eau); color: #fff; border: 0; padding: .6rem 1rem; font-weight: 700; }
+.bouton-secondaire { background: var(--surface); color: var(--encre); border: 1px solid var(--encre); padding: .55rem 1rem; }
+.bouton-discret { background: none; border: 0; color: var(--discret); text-decoration: underline; padding: .5rem; }
+select, input { border: 1px solid var(--trait); background: var(--surface); padding: .5rem .6rem; }
+
+.discret { color: var(--discret); font-size: .9rem; }
+.erreur { color: var(--alerte); min-height: 1.5em; }
+
+/* --- Connexion --- */
+.connexion { max-width: 24rem; margin: 12vh auto 0; padding: 0 1rem; }
+.connexion .marque { font-size: 2rem; }
+.accroche { color: var(--discret); margin-bottom: 1.5rem; }
+.connexion form { display: grid; gap: .4rem; }
+.connexion label { font-weight: 700; margin-top: .5rem; }
+.connexion button { margin-top: 1rem; }
+
+/* --- Barre --- */
+.barre {
+  display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+  padding: .75rem 1.5rem; background: var(--surface); border-bottom: 1px solid var(--trait);
+}
+.barre .marque { font-weight: 700; font-size: 1.125rem; }
+.onglets { display: flex; gap: .25rem; flex: 1; flex-wrap: wrap; }
+.onglets button {
+  background: none; border: 1px solid transparent; padding: .4rem .8rem; color: var(--discret); white-space: nowrap;
+}
+.onglets button[aria-selected="true"] { border-color: var(--encre); color: var(--encre); font-weight: 700; }
+
+/* --- Grille --- */
+.tableau {
+  display: grid; gap: 1.25rem; padding: 1.5rem; max-width: 72rem; margin: 0 auto;
+  grid-template-columns: minmax(16rem, 1fr) minmax(18rem, 1.2fr);
+  grid-template-areas: "sol vanne" "sol releves" "historique historique";
+}
+.tableau > section { background: var(--surface); border: 1px solid var(--trait); border-radius: var(--rayon); padding: 1.25rem; }
+.sol { grid-area: sol; }
+.vanne { grid-area: vanne; }
+.releves { grid-area: releves; }
+.historique { grid-area: historique; }
+
+/* --- L'élément central : la colonne de sol qui se remplit d'eau --- */
+.profil { display: flex; gap: 1.5rem; align-items: flex-end; }
+.colonne {
+  position: relative; width: 4.5rem; height: 16rem; flex: none;
+  background: repeating-linear-gradient(0deg, var(--terre-clair) 0 14px, #e8d9cb 14px 15px);
+  border: 2px solid var(--terre); border-radius: var(--rayon); overflow: hidden;
+}
+.eau {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 0;
+  background: linear-gradient(var(--eau), #155a8a);
+  transition: height .8s ease;
+}
+.seuil { position: absolute; left: 0; right: 0; bottom: 25%; border-top: 2px dashed var(--alerte); }
+.legende { margin-top: .75rem; font-size: .9rem; color: var(--discret); }
+.trait-seuil { display: inline-block; width: 1.5rem; margin-right: .5rem; vertical-align: middle; border-top: 2px dashed var(--alerte); }
+.profil > div:last-child { padding-bottom: .25rem; }
+.chiffre { font-size: 4rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.chiffre small { font-size: 1.5rem; color: var(--discret); }
+.sol.sec .chiffre { color: var(--terre); }
+.statut { margin-top: .75rem; font-weight: 700; }
+.statut.en-ligne { color: var(--ok); }
+.statut.hors-ligne { color: var(--alerte); }
+
+/* --- Vanne --- */
+.etat-vanne { font-size: 1.5rem; font-weight: 700; }
+.etat-vanne.ouverte { color: var(--eau); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: 1rem; }
+.actions label { font-weight: 700; }
+.message { margin-top: .75rem; min-height: 1.5em; }
+.message.attente { color: var(--discret); }
+.message.ok { color: var(--ok); }
+.message.ko { color: var(--alerte); }
+
+/* --- Relevés --- */
+.releves dl { margin: 0; display: grid; gap: .5rem; }
+.releves dl > div { display: flex; justify-content: space-between; border-bottom: 1px solid var(--trait); padding-bottom: .4rem; }
+.releves dt { color: var(--discret); }
+.releves dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* --- Historique --- */
+.entete-historique { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: .75rem; }
+.entete-historique h2 { margin: 0; }
+.choix { display: flex; gap: .5rem; flex-wrap: wrap; }
+.bascule { display: inline-flex; border: 1px solid var(--trait); border-radius: var(--rayon); overflow: hidden; }
+.bascule button { background: var(--surface); border: 0; border-radius: 0; padding: .45rem .8rem; color: var(--discret); }
+.bascule button[aria-pressed="true"] { background: var(--encre); color: #fff; }
+.graphique { position: relative; height: 18rem; }
+
+/* --- Mobile --- */
+@media (max-width: 760px) {
+  .barre { padding: .75rem 1rem; gap: .5rem; justify-content: space-between; }
+  .onglets { order: 3; flex-basis: 100%; flex-wrap: nowrap; overflow-x: auto; }
+  .tableau { padding: 1rem; grid-template-columns: 1fr; grid-template-areas: "sol" "vanne" "releves" "historique"; }
+  .colonne { height: 12rem; }
+  .chiffre { font-size: 3rem; }
+}
+@media (prefers-reduced-motion: reduce) { .eau { transition: none; } }

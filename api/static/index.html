@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jaden Konekté — tableau de bord</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+
+  <!-- Écran de connexion -->
+  <main id="ecran-connexion" class="connexion" hidden>
+    <h1 class="marque">Jaden Konekté</h1>
+    <p class="accroche">Suivez l'humidité de vos parcelles et arrosez au bon moment.</p>
+    <form id="form-connexion" novalidate>
+      <label for="courriel">Courriel</label>
+      <input id="courriel" type="email" autocomplete="username" required>
+      <label for="mot-de-passe">Mot de passe</label>
+      <input id="mot-de-passe" type="password" autocomplete="current-password" required>
+      <button type="submit" class="bouton-principal">Se connecter</button>
+      <p id="erreur-connexion" class="erreur" role="alert"></p>
+    </form>
+  </main>
+
+  <!-- Tableau de bord -->
+  <div id="ecran-tableau" hidden>
+    <header class="barre">
+      <span class="marque">Jaden Konekté</span>
+      <nav id="parcelles" class="onglets" aria-label="Parcelles"></nav>
+      <button id="deconnexion" class="bouton-discret">Se déconnecter</button>
+    </header>
+
+    <main class="tableau">
+      <section class="sol" aria-labelledby="titre-sol">
+        <h2 id="titre-sol">Humidité du sol</h2>
+        <div class="profil">
+          <div class="colonne" aria-hidden="true">
+            <div id="eau" class="eau"></div>
+            <div id="seuil" class="seuil"></div>
+          </div>
+          <div>
+            <p class="chiffre"><span id="humidite">–</span><small> %</small></p>
+            <p id="humidite-ts" class="discret"></p>
+            <p id="objet-statut" class="statut"></p>
+          </div>
+        </div>
+        <p class="legende"><span class="trait-seuil" aria-hidden="true"></span>Seuil d'arrosage : <span id="seuil-valeur">25</span> %</p>
+      </section>
+
+      <section class="vanne" aria-labelledby="titre-vanne">
+        <h2 id="titre-vanne">Vanne</h2>
+        <p id="vanne-etat" class="etat-vanne">–</p>
+        <p id="vanne-jusqua" class="discret"></p>
+        <div class="actions">
+          <label for="duree">Durée</label>
+          <select id="duree">
+            <option value="300">5 min</option>
+            <option value="600" selected>10 min</option>
+            <option value="1200">20 min</option>
+            <option value="1800">30 min</option>
+          </select>
+          <button id="ouvrir" class="bouton-principal">Ouvrir la vanne</button>
+          <button id="fermer" class="bouton-secondaire">Fermer la vanne</button>
+        </div>
+        <p id="vanne-message" class="message" role="status"></p>
+      </section>
+
+      <section class="releves" aria-labelledby="titre-releves">
+        <h2 id="titre-releves">Autres relevés</h2>
+        <dl>
+          <div><dt>Température</dt><dd><span id="temperature">–</span> °C</dd></div>
+          <div><dt>Luminosité</dt><dd><span id="luminosite">–</span> lx</dd></div>
+          <div><dt>Pluie</dt><dd><span id="intensite">–</span> mm/h</dd></div>
+        </dl>
+      </section>
+
+      <section class="historique" aria-labelledby="titre-historique">
+        <div class="entete-historique">
+          <h2 id="titre-historique">Historique</h2>
+          <div class="choix">
+            <select id="grandeur" aria-label="Grandeur affichée">
+              <option value="humidite">Humidité du sol</option>
+              <option value="temperature">Température</option>
+              <option value="luminosite">Luminosité</option>
+              <option value="intensite">Pluie</option>
+            </select>
+            <div class="bascule" role="group" aria-label="Période">
+              <button data-periode="24h" aria-pressed="true">24 h</button>
+              <button data-periode="7j" aria-pressed="false">7 jours</button>
+            </div>
+          </div>
+        </div>
+        <div id="zone-graphique" class="graphique"><canvas id="graphique" aria-label="Historique de la grandeur choisie"></canvas></div>
+        <p id="historique-message" class="discret"></p>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
