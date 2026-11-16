@@ -20,20 +20,31 @@ TITRES = {
 }
 
 
-def probleme(status: int, detail: str | None = None, **extra) -> JSONResponse:
+def probleme(status: int, detail: str | None = None, headers: dict | None = None, **extra) -> JSONResponse:
     code, titre = TITRES.get(status, ("erreur", "Erreur"))
     corps = Probleme(type=TYPE_BASE + code, title=titre, status=status, detail=detail)
     return JSONResponse(
         status_code=status,
         content={**corps.model_dump(), **extra},
         media_type="application/problem+json",
+        headers=headers,
     )
+
+
+def reponses(*codes: int) -> dict:
+    """Déclare des erreurs Problem Details dans la documentation d'une route."""
+    return {
+        c: {"model": Probleme, "description": TITRES[c][1],
+            "content": {"application/problem+json": {}}}
+        for c in codes
+    }
 
 
 def installer(app: FastAPI) -> None:
     @app.exception_handler(StarletteHTTPException)
     async def erreur_http(request: Request, exc: StarletteHTTPException):
-        return probleme(exc.status_code, str(exc.detail) if exc.detail else None)
+        detail = str(exc.detail) if exc.detail else None
+        return probleme(exc.status_code, detail, headers=getattr(exc, "headers", None))
 
     @app.exception_handler(RequestValidationError)
     async def erreur_validation(request: Request, exc: RequestValidationError):
