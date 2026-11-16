@@ -14,9 +14,9 @@ services:
   db:
     image: timescale/timescaledb-ha:pg16   # inclut TimescaleDB et pgvector
     environment:
-      POSTGRES_USER: jaden
-      POSTGRES_PASSWORD: jaden        # développement uniquement
-      POSTGRES_DB: jaden
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}        # développement uniquement
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -33,9 +33,11 @@ services:
               "--exploitation", "expl-1", "--parcelles", "p1", "p2", "p3"]
     depends_on: [mqtt]
     profiles: ["simu"]     # docker compose --profile simu up -d
-    
+
   api:
     build: ../api
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     ports:
       - "8000:8000"
     depends_on:
