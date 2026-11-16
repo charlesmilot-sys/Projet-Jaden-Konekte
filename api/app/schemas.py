@@ -76,3 +76,31 @@ class SerieMesures(BaseModel):
     periode: Periode
     intervalle: str = Field(examples=["1 hour"])
     points: list[PointMesure]
+
+
+
+
+# --- Vanne --------------------------------------------------------------------
+
+class Equipement(BaseModel):
+    id: int
+    type: Literal["vanne"]
+    etat: Literal["ouverte", "fermee"]
+    jusqua: datetime | None = Field(None, description="Fermeture prévue si la vanne est ouverte")
+    derniere_cmd: str | None = Field(None, examples=["cmd-42"])
+    en_ligne: bool = Field(description="Dernier statut publié par l'objet (online / offline)")
+    maj_le: datetime | None = None
+
+
+class CommandeEntree(BaseModel):
+    action: Literal["ouvrir", "fermer"]
+    duree_s: int = Field(600, ge=10, le=3600, description="Utilisée seulement pour « ouvrir »")
+
+
+class Commande(BaseModel):
+    id: str = Field(examples=["cmd-3f2a9c1e5b7d"])
+    action: Literal["ouvrir", "fermer"]
+    duree_s: int | None = None
+    origine: Literal["manuelle", "regle", "agent"]
+    statut: Literal["envoyee", "confirmee", "echec"]
+    cree_le: datetime

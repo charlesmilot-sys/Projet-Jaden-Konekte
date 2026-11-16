@@ -2,6 +2,8 @@
 import json
 import logging
 import os
+import threading
+import time
 from datetime import datetime
 
 import paho.mqtt.client as mqtt
@@ -19,7 +21,8 @@ MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 MQTT_UTILISATEUR = os.environ.get("MQTT_UTILISATEUR")
 MQTT_MOT_DE_PASSE = os.environ.get("MQTT_MOT_DE_PASSE")
 
-TOPIC_MESURES = "jaden/+/+/+/+"   # jaden/<expl>/<parcelle>/<type>/<grandeur>
+TOPIC = "jaden/#"                  # mesures, statut des objets et état des vannes
+DELAI_CONFIRMATION_S = 30          # au-delà, une commande non confirmée passe en échec
 
 # Clé : (exploitation, parcelle, type, grandeur) -> (capteur, état)
 capteurs: dict[tuple[str, str, str, str], tuple[Capteur, Etat]] = {}
@@ -74,8 +77,20 @@ def lire_message(contenu: bytes) -> tuple[float, datetime]:
 
 
 def traiter(conn: psycopg.Connection, topic: str, contenu: bytes) -> None:
+    """Aiguille chaque message selon son topic."""
     morceaux = topic.split("/")
-    capteur_etat = capteurs.get(tuple(morceaux[1:])) if len(morceaux) == 5 else None
+    if len(morceaux) == 4 and morceaux[3] == "statut":
+        traiter_statut(conn, morceaux[1], morceaux[2], contenu)
+    elif len(morceaux) == 5 and morceaux[3:] == ["vanne", "etat"]:
+        traiter_etat_vanne(conn, morceaux[1], morceaux[2], contenu)
+    elif len(morceaux) == 5:
+        traiter_mesure(conn, topic, morceaux, contenu)
+
+
+# --- Mesures ------------------------------------------------------------------
+
+def traiter_mesure(conn: psycopg.Connection, topic: str, morceaux: list[str], contenu: bytes) -> None:
+    capteur_etat = capteurs.get(tuple(morceaux[1:]))
     if capteur_etat is None:
         log.debug("Topic ignoré (aucun capteur connu) : %s", topic)
         return
@@ -105,6 +120,72 @@ def traiter(conn: psycopg.Connection, topic: str, contenu: bytes) -> None:
         log.warning("Mesure marquée invalide : %s = %s", topic, valeur)
 
 
+# --- Objets et vannes -----------------------------------------------------------
+
+# Met à jour la vanne d'une parcelle désignée par ses codes MQTT
+MAJ_VANNE = """
+    UPDATE equipement q SET {colonnes}, maj_le = now()
+    FROM parcelle p JOIN exploitation e ON e.id = p.exploitation
+    WHERE q.parcelle = p.id AND q.type = 'vanne'
+      AND e.code = %(expl)s AND p.code = %(parcelle)s
+"""
+
+
+def traiter_statut(conn: psycopg.Connection, expl: str, parcelle: str, contenu: bytes) -> None:
+    statut = contenu.decode(errors="replace").strip()
+    if statut not in ("online", "offline"):
+        log.warning("Statut inconnu pour %s/%s : %r", expl, parcelle, statut)
+        return
+    conn.execute(MAJ_VANNE.format(colonnes="en_ligne = %(en_ligne)s"),
+                 {"en_ligne": statut == "online", "expl": expl, "parcelle": parcelle})
+    log.info("Objet %s/%s : %s", expl, parcelle, statut)
+
+
+def traiter_etat_vanne(conn: psycopg.Connection, expl: str, parcelle: str, contenu: bytes) -> None:
+    try:
+        donnees = json.loads(contenu)
+        etat = donnees["etat"]
+        if etat not in ("ouverte", "fermee"):
+            raise ValueError(f"état inconnu {etat!r}")
+        jusqua = datetime.fromisoformat(donnees["jusqua"]) if donnees.get("jusqua") else None
+        derniere_cmd = donnees.get("derniere_cmd")
+    except (ValueError, KeyError, TypeError) as e:
+        log.warning("État de vanne mal formé pour %s/%s (%s)", expl, parcelle, e)
+        return
+
+    conn.execute(
+        MAJ_VANNE.format(colonnes="etat = %(etat)s, jusqua = %(jusqua)s, derniere_cmd = %(cmd)s"),
+        {"etat": etat, "jusqua": jusqua, "cmd": derniere_cmd, "expl": expl, "parcelle": parcelle},
+    )
+    if derniere_cmd:
+        # La vanne confirme avoir exécuté cette commande
+        cur = conn.execute(
+            "UPDATE commande SET statut = 'confirmee' WHERE id = %s AND statut <> 'confirmee' RETURNING id",
+            (derniere_cmd,),
+        )
+        if cur.fetchone():
+            log.info("Commande %s confirmée par %s/%s (vanne %s)", derniere_cmd, expl, parcelle, etat)
+
+
+def surveiller_commandes(conn: psycopg.Connection) -> None:
+    """Toutes les 10 s : une commande sans confirmation depuis plus de 30 s passe en échec."""
+    while True:
+        time.sleep(10)
+        try:
+            cur = conn.execute(
+                """
+                UPDATE commande SET statut = 'echec'
+                WHERE statut = 'envoyee' AND cree_le < now() - make_interval(secs => %s)
+                RETURNING id
+                """,
+                (DELAI_CONFIRMATION_S,),
+            )
+            for ligne in cur.fetchall():
+                log.warning("Commande %s sans confirmation : échec", ligne["id"])
+        except psycopg.Error:
+            log.exception("Erreur pendant la surveillance des commandes")
+
+
 def main() -> None:
     conn = psycopg.connect(DATABASE_URL, autocommit=True, row_factory=dict_row)
     charger_capteurs(conn)
@@ -121,14 +202,16 @@ def main() -> None:
         if reason_code.is_failure:
             log.error("Connexion MQTT refusée : %s", reason_code)
             return
-        c.subscribe(TOPIC_MESURES, qos=1)
-        log.info("Connecté à %s:%d, abonné à %s", MQTT_HOTE, MQTT_PORT, TOPIC_MESURES)
+        c.subscribe(TOPIC, qos=1)
+        log.info("Connecté à %s:%d, abonné à %s", MQTT_HOTE, MQTT_PORT, TOPIC)
 
     def on_message(c, userdata, msg):
         try:
             traiter(conn, msg.topic, msg.payload)
         except psycopg.Error:
             log.exception("Erreur base de données sur %s", msg.topic)
+
+    threading.Thread(target=surveiller_commandes, args=(conn,), daemon=True).start()
 
     client.on_connect = on_connect
     client.on_message = on_message

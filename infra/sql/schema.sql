@@ -62,11 +62,14 @@ CREATE TABLE mesure (
 SELECT create_hypertable('mesure', 'ts');
 
 CREATE TABLE equipement (
-  id        SERIAL PRIMARY KEY,
-  parcelle  INT NOT NULL REFERENCES parcelle(id) ON DELETE CASCADE,
-  type      VARCHAR(20) NOT NULL DEFAULT 'vanne',
-  etat      VARCHAR(20) NOT NULL DEFAULT 'fermee',
-  maj_le    TIMESTAMPTZ
+  id           SERIAL PRIMARY KEY,
+  parcelle     INT NOT NULL REFERENCES parcelle(id) ON DELETE CASCADE,
+  type         VARCHAR(20) NOT NULL DEFAULT 'vanne',
+  etat         VARCHAR(20) NOT NULL DEFAULT 'fermee',
+  en_ligne     BOOLEAN NOT NULL DEFAULT false,   -- dernier statut publié par l'objet
+  jusqua       TIMESTAMPTZ,                      -- fermeture prévue (vanne ouverte)
+  derniere_cmd VARCHAR(40),                      -- dernière commande confirmée par l'objet
+  maj_le       TIMESTAMPTZ
 );
 
 CREATE TABLE regle (
