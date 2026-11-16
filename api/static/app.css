@@ -107,6 +107,9 @@ select, input { border: 1px solid var(--trait); background: var(--surface); padd
 .message.ok { color: var(--ok); }
 .message.ko { color: var(--alerte); }
 
+.auto { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--trait); display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; justify-content: space-between; }
+.auto p { flex: 1 1 16rem; }
+
 /* --- Relevés --- */
 .releves dl { margin: 0; display: grid; gap: .5rem; }
 .releves dl > div { display: flex; justify-content: space-between; border-bottom: 1px solid var(--trait); padding-bottom: .4rem; }

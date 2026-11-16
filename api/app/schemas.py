@@ -1,6 +1,7 @@
-from typing import Literal
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field
+from typing import Literal
+
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 class Probleme(BaseModel):
@@ -54,8 +55,6 @@ class PageParcelles(BaseModel):
     taille: int
     total: int
 
-
-
 # --- Mesures ------------------------------------------------------------------
 
 Grandeur = Literal["humidite", "temperature", "luminosite", "intensite"]
@@ -76,8 +75,6 @@ class SerieMesures(BaseModel):
     periode: Periode
     intervalle: str = Field(examples=["1 hour"])
     points: list[PointMesure]
-
-
 
 
 # --- Vanne --------------------------------------------------------------------
@@ -106,8 +103,6 @@ class Commande(BaseModel):
     cree_le: datetime
 
 
-
-
 # --- Flux temps réel ------------------------------------------------------------
 
 class ValeurCourante(BaseModel):
@@ -120,3 +115,65 @@ class EtatParcelle(BaseModel):
     """Ce que le tableau de bord affiche en direct pour une parcelle."""
     mesures: dict[str, ValeurCourante]   # clé : grandeur (humidite, temperature…)
     vanne: Equipement | None
+
+
+# --- Règle d'arrosage -------------------------------------------------------------
+
+class Clause(BaseModel):
+    capteur: Literal["sol/humidite", "air/temperature", "air/luminosite", "pluvio/intensite"] | None = None
+    meteo: Literal["pluie_6h"] | None = None
+    op: Literal["<", "<=", ">", ">="]
+    valeur: float
+
+    @model_validator(mode="after")
+    def une_seule_source(self):
+        if (self.capteur is None) == (self.meteo is None):
+            raise ValueError("une clause porte soit sur un capteur, soit sur la météo")
+        return self
+
+
+class Condition(BaseModel):
+    et: list[Clause] = Field(min_length=1)
+
+
+class Action(BaseModel):
+    equipement: Literal["vanne"] = "vanne"
+    action: Literal["ouvrir"] = "ouvrir"
+    duree_s: int = Field(600, ge=10, le=3600)
+
+
+class RegleEntree(BaseModel):
+    nom: str = Field(min_length=1, max_length=80)
+    condition: Condition
+    action: Action
+    active: bool = True
+    delai_min_s: int = Field(7200, ge=0)
+
+
+class RegleModification(BaseModel):
+    """Seuls les champs envoyés sont modifiés."""
+    nom: str | None = Field(None, min_length=1, max_length=80)
+    condition: Condition | None = None
+    action: Action | None = None
+    active: bool | None = None
+    delai_min_s: int | None = Field(None, ge=0)
+
+    @model_validator(mode="after")
+    def au_moins_un_champ(self):
+        if not self.model_fields_set:
+            raise ValueError("indiquez au moins un champ à modifier")
+        for champ in self.model_fields_set:
+            if getattr(self, champ) is None:
+                raise ValueError(f"le champ {champ} ne peut pas être null")
+        return self
+
+
+class Regle(BaseModel):
+    id: int
+    parcelle: int
+    nom: str
+    condition: Condition
+    action: Action
+    active: bool
+    delai_min_s: int
+    derniere_execution: datetime | None = None

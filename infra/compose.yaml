@@ -60,6 +60,19 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  regles:
+    build: ../regles
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      MQTT_HOTE: mqtt
+      PERIODE_REGLES_S: "30"
+    depends_on:
+      db:
+        condition: service_healthy
+      mqtt:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   mqtt-data:
   db-data:

@@ -2,7 +2,7 @@
 "use strict";
 
 const API = "/api/v1";
-const SEUIL_ARROSAGE = 25;          // affiché sur la colonne ; viendra de la règle de la parcelle
+const SEUIL_DEFAUT = 25;            // seuil affiché quand la parcelle n'a pas de règle
 const DELAI_CONFIRMATION_MS = 35000; // un peu plus que les 30 s du serveur
 
 const etat = {
@@ -12,6 +12,8 @@ const etat = {
   commandeEnAttente: null,  // { id, minuteur }
   periode: "24h",
   graphique: null,
+  regle: null,              // règle d'arrosage de la parcelle (ou null)
+  seuil: SEUIL_DEFAUT,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -105,6 +107,7 @@ function choisirParcelle(id) {
   }
   annulerAttente();
   $("vanne-message").textContent = "";
+  chargerRegle(id);
   ecouterFlux(id);
   chargerHistorique();
 }
@@ -172,9 +175,7 @@ function afficherEtat({ mesures, vanne }) {
   $("humidite").textContent = h ? nombre(h.valeur) : "–";
   $("humidite-ts").textContent = h ? `Mesure du ${format.format(new Date(h.ts))}` : "Pas encore de mesure valide";
   $("eau").style.height = h ? `${Math.min(100, Math.max(0, h.valeur))}%` : "0";
-  $("seuil").style.bottom = `${SEUIL_ARROSAGE}%`;
-  $("seuil-valeur").textContent = SEUIL_ARROSAGE;
-  document.querySelector(".sol").classList.toggle("sec", !!h && h.valeur < SEUIL_ARROSAGE);
+  document.querySelector(".sol").classList.toggle("sec", !!h && h.valeur < etat.seuil);
 
   // Autres relevés
   $("temperature").textContent = mesures.temperature ? nombre(mesures.temperature.valeur) : "–";
@@ -246,6 +247,54 @@ function afficherMessage(texte, genre) {
   $("vanne-message").textContent = texte;
   $("vanne-message").className = `message ${genre}`;
 }
+
+// ---------------------------------------------------------------------------
+// Règle d'arrosage automatique
+// ---------------------------------------------------------------------------
+
+async function chargerRegle(id) {
+  try {
+    etat.regle = await api(`/parcelles/${id}/regle`);
+  } catch {
+    etat.regle = null;   // 404 : pas de règle pour cette parcelle
+  }
+  if (id === etat.parcelle) afficherRegle();
+}
+
+function afficherRegle() {
+  const r = etat.regle;
+  const sol = r?.condition.et.find((c) => c.capteur === "sol/humidite");
+  const pluie = r?.condition.et.find((c) => c.meteo === "pluie_6h");
+  etat.seuil = sol ? sol.valeur : SEUIL_DEFAUT;
+  $("seuil").style.bottom = `${etat.seuil}%`;
+  $("seuil-valeur").textContent = nombre(etat.seuil);
+
+  const bouton = $("regle-bascule");
+  if (!r) {
+    $("regle-texte").textContent = "Pas d'arrosage automatique sur cette parcelle.";
+    bouton.hidden = true;
+    return;
+  }
+  const minutes = Math.round(r.action.duree_s / 60);
+  $("regle-texte").textContent = r.active
+    ? `Arrosage automatique activé : ${minutes} min quand le sol passe sous ${nombre(etat.seuil)} %`
+      + (pluie ? ` et que moins de ${nombre(pluie.valeur)} mm de pluie sont prévus.` : ".")
+    : "Arrosage automatique désactivé.";
+  bouton.textContent = r.active ? "Désactiver l'arrosage automatique" : "Activer l'arrosage automatique";
+  bouton.hidden = false;
+}
+
+$("regle-bascule").addEventListener("click", async () => {
+  try {
+    etat.regle = await api(`/parcelles/${etat.parcelle}/regle`, {
+      method: "PATCH",
+      body: JSON.stringify({ active: !etat.regle.active }),
+    });
+    afficherRegle();
+  } catch (err) {
+    $("regle-texte").textContent = err.message;
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Historique (Chart.js)
