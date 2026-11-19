@@ -26,7 +26,8 @@ async function api(chemin, options = {}) {
   const reponse = await fetch(API + chemin, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      // Pour un envoi de fichier (FormData), le navigateur fixe lui-même le Content-Type multipart
+      ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
       ...(etat.jeton ? { Authorization: `Bearer ${etat.jeton}` } : {}),
       ...options.headers,
     },
@@ -98,6 +99,7 @@ async function ouvrirTableau() {
     nav.append(bouton);
   }
   choisirParcelle(page.elements[0].id);
+  chargerDiagnostics();
 }
 
 function choisirParcelle(id) {
@@ -360,6 +362,146 @@ async function chargerHistorique() {
         scales: { x: { grid: { display: false } }, y: { grid: { color: "#e3e9e0" } } },
       },
     });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Diagnostic par photo
+// ---------------------------------------------------------------------------
+
+const pourcent = (v) => `${Math.round(v * 100)} %`;
+const SAINE = "Tomato___healthy";
+
+$("photo").addEventListener("change", () => {
+  const fichier = $("photo").files[0];
+  $("analyser").disabled = !fichier;
+  if (!fichier) return;
+  const apercu = $("apercu");
+  if (apercu.src) URL.revokeObjectURL(apercu.src);
+  apercu.src = URL.createObjectURL(fichier);
+  apercu.hidden = false;
+  $("zone-texte").hidden = true;
+});
+
+$("form-diagnostic").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const fichier = $("photo").files[0];
+  if (!fichier) return;
+  const donnees = new FormData();
+  donnees.append("image", fichier);
+  if (etat.parcelle) donnees.append("parcelle", etat.parcelle);
+
+  $("analyser").disabled = true;
+  $("analyser").textContent = "Analyse en cours…";
+  try {
+    const diag = await api("/diagnostics", { method: "POST", body: donnees });
+    afficherDiagnostic(diag);
+    chargerDiagnostics();
+  } catch (err) {
+    const zone = $("diag-resultat");
+    zone.replaceChildren(paragraphe(err.message, "erreur"));
+  } finally {
+    $("analyser").disabled = false;
+    $("analyser").textContent = "Analyser la photo";
+  }
+});
+
+function paragraphe(texte, classe = "") {
+  const p = document.createElement("p");
+  p.textContent = texte;           // textContent : jamais de HTML injecté
+  if (classe) p.className = classe;
+  return p;
+}
+
+function afficherDiagnostic(diag) {
+  const zone = $("diag-resultat");
+  zone.replaceChildren();
+
+  const maladie = paragraphe(diag.libelle, "diag-maladie" + (diag.classe === SAINE ? " saine" : ""));
+  const jauge = document.createElement("div");
+  jauge.className = "jauge" + (diag.fiable ? "" : " faible");
+  jauge.setAttribute("role", "img");
+  jauge.setAttribute("aria-label", `Confiance du modèle : ${pourcent(diag.score)}`);
+  const barre = document.createElement("div");
+  barre.style.width = pourcent(diag.score).replace(" ", "");
+  jauge.append(barre);
+  zone.append(maladie, jauge, paragraphe(`Confiance du modèle : ${pourcent(diag.score)}`, "discret"));
+
+  if (!diag.fiable) {
+    zone.append(paragraphe(
+      "Le modèle n'est pas sûr de lui. La photo n'est peut-être pas une feuille de tomate, " +
+      "ou elle est floue ou mal éclairée : reprenez une photo d'une seule feuille, de près.",
+      "avertissement"));
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "diag-actions";
+  if (diag.confirme === null) {
+    const oui = bouton("C'est bien ça", "bouton-principal", () => confirmer(diag.id, true));
+    const non = bouton("Ce n'est pas ça", "bouton-secondaire", () => confirmer(diag.id, false));
+    actions.append(oui, non);
+  } else {
+    actions.append(paragraphe(diag.confirme ? "Vous avez confirmé ce diagnostic." : "Vous avez indiqué que ce diagnostic est faux.", "discret"));
+  }
+  zone.append(actions);
+}
+
+function bouton(texte, classe, action) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = classe;
+  b.textContent = texte;
+  b.addEventListener("click", action);
+  return b;
+}
+
+async function confirmer(id, confirme) {
+  try {
+    const diag = await api(`/diagnostics/${id}`, { method: "PATCH", body: JSON.stringify({ confirme }) });
+    afficherDiagnostic(diag);
+    chargerDiagnostics();
+  } catch (err) {
+    $("diag-resultat").append(paragraphe(err.message, "erreur"));
+  }
+}
+
+// La photo demande le jeton : une balise <img src> ne peut pas l'envoyer,
+// on la télécharge donc avec fetch() puis on l'affiche depuis la mémoire (blob).
+async function chargerVignette(img, url) {
+  try {
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${etat.jeton}` } });
+    if (r.ok) img.src = URL.createObjectURL(await r.blob());
+  } catch { /* vignette absente : sans gravité */ }
+}
+
+async function chargerDiagnostics() {
+  const liste = $("diag-liste");
+  try {
+    const page = await api("/diagnostics?taille=5");
+    for (const img of liste.querySelectorAll("img")) if (img.src) URL.revokeObjectURL(img.src);
+    liste.replaceChildren();
+    if (page.elements.length === 0) {
+      liste.append(Object.assign(document.createElement("li"), { textContent: "Aucun diagnostic pour l'instant : envoyez une première photo." }));
+      return;
+    }
+    for (const d of page.elements) {
+      const li = document.createElement("li");
+      const img = document.createElement("img");
+      img.alt = "";
+      chargerVignette(img, d.image_url);
+      const texte = document.createElement("div");
+      const titre = d.statut === "termine" ? d.libelle : "Analyse impossible";
+      texte.append(
+        Object.assign(document.createElement("strong"), { textContent: titre }),
+        paragraphe(`${format.format(new Date(d.cree_le))}` + (d.score != null ? ` · ${pourcent(d.score)}` : ""), "discret"),
+      );
+      const avis = { true: "Confirmé", false: "Infirmé", null: "À confirmer" }[String(d.confirme)];
+      li.append(img, texte, Object.assign(document.createElement("span"), { className: "avis", textContent: d.statut === "termine" ? avis : "" }));
+      li.addEventListener("click", () => d.statut === "termine" && afficherDiagnostic(d));
+      liste.append(li);
+    }
+  } catch (err) {
+    liste.replaceChildren(Object.assign(document.createElement("li"), { textContent: err.message }));
   }
 }
 

@@ -177,3 +177,35 @@ class Regle(BaseModel):
     active: bool
     delai_min_s: int
     derniere_execution: datetime | None = None
+
+
+# --- Diagnostics ----------------------------------------------------------------
+
+class Diagnostic(BaseModel):
+    id: int
+    parcelle: int | None = None
+    classe: str | None = Field(default=None, examples=["Tomato___Late_blight"])
+    libelle: str | None = Field(default=None, description="Nom de la maladie en français",
+                                examples=["Mildiou"])
+    score: float | None = Field(default=None, ge=0, le=1, examples=[0.94])
+    fiable: bool | None = Field(default=None,
+                                description="Score au-dessus du seuil de confiance ; "
+                                            "sinon il faut reprendre la photo")
+    modele: str | None = Field(default=None, examples=["mobilenetv3-tomate-v1"])
+    statut: Literal["en_cours", "termine", "echec"]
+    image_url: str
+    confirme: bool | None = Field(default=None,
+                                  description="Validation par l'exploitant (null tant qu'il n'a pas répondu)")
+    cree_le: datetime
+    termine_le: datetime | None = None
+
+
+class PageDiagnostics(BaseModel):
+    elements: list[Diagnostic]
+    page: int
+    taille: int
+    total: int
+
+
+class Confirmation(BaseModel):
+    confirme: bool

@@ -66,7 +66,7 @@ select, input { border: 1px solid var(--trait); background: var(--surface); padd
 .tableau {
   display: grid; gap: 1.25rem; padding: 1.5rem; max-width: 72rem; margin: 0 auto;
   grid-template-columns: minmax(16rem, 1fr) minmax(18rem, 1.2fr);
-  grid-template-areas: "sol vanne" "sol releves" "historique historique";
+  grid-template-areas: "sol vanne" "sol releves" "historique historique" "diagnostic diagnostic";
 }
 .tableau > section { background: var(--surface); border: 1px solid var(--trait); border-radius: var(--rayon); padding: 1.25rem; }
 .sol { grid-area: sol; }
@@ -125,11 +125,39 @@ select, input { border: 1px solid var(--trait); background: var(--surface); padd
 .bascule button[aria-pressed="true"] { background: var(--encre); color: #fff; }
 .graphique { position: relative; height: 18rem; }
 
+/* --- Diagnostic par photo --- */
+.diagnostic { grid-area: diagnostic; }
+.diag-grille { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 1.25rem; align-items: start; }
+.diag-grille > * { min-width: 0; }   /* empêche la photo d'élargir la grille au-delà de l'écran */
+.diag-envoi { display: grid; gap: .75rem; }
+.zone-photo {
+  display: grid; place-items: center; text-align: center; min-height: 12rem; padding: 1rem; cursor: pointer;
+  border: 2px dashed var(--trait); border-radius: var(--rayon); background: var(--fond); overflow: hidden;
+}
+.zone-photo:hover { border-color: var(--ok); }
+#photo:focus-visible + .bouton-principal, .diag-envoi:focus-within .zone-photo { outline: 3px solid var(--eau); outline-offset: 2px; }
+.zone-photo img { display: block; max-width: 100%; max-height: 14rem; object-fit: contain; border-radius: var(--rayon); }
+.visuellement-cache { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.diag-resultat { display: grid; gap: .6rem; }
+.diag-maladie { font-size: 1.75rem; font-weight: 700; line-height: 1.2; }
+.diag-maladie.saine { color: var(--ok); }
+.jauge { height: .6rem; background: var(--trait); border-radius: 99px; overflow: hidden; }
+.jauge > div { height: 100%; background: var(--ok); }
+.jauge.faible > div { background: var(--terre); }
+.avertissement { background: var(--terre-clair); border-left: 4px solid var(--terre); padding: .6rem .8rem; border-radius: var(--rayon); }
+.diag-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.sous-titre { font-size: 1rem; margin: 1.5rem 0 .5rem; }
+.diag-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+.diag-liste li { display: flex; gap: .75rem; align-items: center; border-bottom: 1px solid var(--trait); padding-bottom: .5rem; }
+.diag-liste img { width: 3rem; height: 3rem; object-fit: cover; border-radius: var(--rayon); background: var(--fond); flex: none; }
+.diag-liste .avis { margin-left: auto; font-size: .9rem; color: var(--discret); white-space: nowrap; }
+@media (max-width: 760px) { .diag-grille { grid-template-columns: 1fr; } }
+
 /* --- Mobile --- */
 @media (max-width: 760px) {
   .barre { padding: .75rem 1rem; gap: .5rem; justify-content: space-between; }
   .onglets { order: 3; flex-basis: 100%; flex-wrap: nowrap; overflow-x: auto; }
-  .tableau { padding: 1rem; grid-template-columns: 1fr; grid-template-areas: "sol" "vanne" "releves" "historique"; }
+  .tableau { padding: 1rem; grid-template-columns: 1fr; grid-template-areas: "sol" "vanne" "releves" "historique" "diagnostic"; }
   .colonne { height: 12rem; }
   .chiffre { font-size: 3rem; }
 }

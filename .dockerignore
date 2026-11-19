@@ -1,0 +1,9 @@
+# Utilisé seulement par les images construites depuis la racine (service inference) :
+# on n'envoie à Docker que les fichiers nécessaires.
+*
+!inference/
+!ia/cnn/pretraitement.py
+!ia/cnn/classes_fr.json
+!ia/cnn/modele/classes.json
+!ia/cnn/modele/tomate_mobilenetv3.onnx
+!ia/cnn/modele/tomate_mobilenetv3.onnx.data

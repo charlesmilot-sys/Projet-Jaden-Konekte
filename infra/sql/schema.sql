@@ -105,6 +105,7 @@ CREATE TABLE diagnostic (
   image_url   VARCHAR(255) NOT NULL,
   statut      VARCHAR(20) NOT NULL DEFAULT 'en_cours',  -- en_cours, termine, echec
   classe      VARCHAR(80),
+  libelle     VARCHAR(120),                             -- nom français de la maladie
   score       REAL,
   modele      VARCHAR(60),                              -- version du modèle utilisé
   confirme    BOOLEAN,                                  -- validation par l'exploitant

@@ -102,6 +102,25 @@
         <div id="zone-graphique" class="graphique"><canvas id="graphique" aria-label="Historique de la grandeur choisie"></canvas></div>
         <p id="historique-message" class="discret"></p>
       </section>
+
+      <section class="diagnostic" aria-labelledby="titre-diagnostic">
+        <h2 id="titre-diagnostic">Diagnostic d'une feuille de tomate</h2>
+        <div class="diag-grille">
+          <form id="form-diagnostic" class="diag-envoi">
+            <label for="photo" class="zone-photo">
+              <img id="apercu" alt="" hidden>
+              <span id="zone-texte">Choisir ou prendre une photo d'une feuille<br><small class="discret">JPEG ou PNG, 5 Mo au plus. Une feuille, bien éclairée, qui remplit la photo.</small></span>
+            </label>
+            <input id="photo" type="file" accept="image/jpeg,image/png" capture="environment" class="visuellement-cache">
+            <button id="analyser" type="submit" class="bouton-principal" disabled>Analyser la photo</button>
+          </form>
+          <div id="diag-resultat" class="diag-resultat" aria-live="polite">
+            <p class="discret">Le résultat s'affichera ici. Il s'agit d'une aide : confirmez-le ou non selon ce que vous voyez sur la plante.</p>
+          </div>
+        </div>
+        <h3 class="sous-titre">Mes derniers diagnostics</h3>
+        <ul id="diag-liste" class="diag-liste"></ul>
+      </section>
     </main>
   </div>
 </body>

@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import erreurs, mqtt
 from app.db import pool
-from app.routes import auth, flux, mesures, parcelles, regles, vanne
+from app.routes import auth, diagnostics, flux, mesures, parcelles, regles, vanne
 
 
 @asynccontextmanager
@@ -32,6 +32,7 @@ app.include_router(mesures.router)
 app.include_router(vanne.router)
 app.include_router(regles.router)
 app.include_router(flux.router)
+app.include_router(diagnostics.router)
 
 # Le tableau de bord (HTML, CSS, JS) est servi par l'API elle-même : même origine, pas de CORS.
 # Monté en dernier : les routes /api/... restent prioritaires.

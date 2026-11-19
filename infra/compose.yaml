@@ -63,13 +63,28 @@ services:
       MQTT_HOTE: mqtt
       MQTT_UTILISATEUR: api
       MQTT_MOT_DE_PASSE: ${MQTT_MDP_API}
+      INFERENCE_URL: http://inference:8001
+      SEUIL_CONFIANCE: "0.6"
     ports:
       - "8000:8000"
+    volumes:
+      - images-data:/donnees/images     # photos des diagnostics
     depends_on:
       db:
         condition: service_healthy
       mqtt:
         condition: service_started
+      inference:
+        condition: service_started
+
+  inference:
+    build:
+      context: ..                       # racine du dépôt : accès à ia/cnn (voir .dockerignore)
+      dockerfile: inference/Dockerfile
+    environment:
+      MODELE_VERSION: mobilenetv3-tomate-v1
+    # Aucun port publié : seul l'API peut l'appeler, par le réseau interne de Docker
+    restart: unless-stopped
 
   ingestion:
     build: ../ingestion
@@ -103,3 +118,4 @@ services:
 volumes:
   mqtt-data:
   db-data:
+  images-data:
