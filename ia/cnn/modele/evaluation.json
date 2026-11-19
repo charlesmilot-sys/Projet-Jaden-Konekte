@@ -1,0 +1,190 @@
+{
+  "modele": "tomate_mobilenetv3.onnx",
+  "exactitude": 0.9948,
+  "par_classe": {
+    "Tomato___Bacterial_spot": {
+      "precision": 0.9976,
+      "rappel": 0.9953,
+      "images": 425
+    },
+    "Tomato___Early_blight": {
+      "precision": 0.985,
+      "rappel": 0.985,
+      "images": 200
+    },
+    "Tomato___Late_blight": {
+      "precision": 0.9973,
+      "rappel": 0.9869,
+      "images": 381
+    },
+    "Tomato___Leaf_Mold": {
+      "precision": 1.0,
+      "rappel": 1.0,
+      "images": 190
+    },
+    "Tomato___Septoria_leaf_spot": {
+      "precision": 0.986,
+      "rappel": 0.9972,
+      "images": 354
+    },
+    "Tomato___Spider_mites Two-spotted_spider_mite": {
+      "precision": 1.0,
+      "rappel": 0.9851,
+      "images": 335
+    },
+    "Tomato___Target_Spot": {
+      "precision": 0.9688,
+      "rappel": 0.9964,
+      "images": 280
+    },
+    "Tomato___Tomato_Yellow_Leaf_Curl_Virus": {
+      "precision": 1.0,
+      "rappel": 0.9991,
+      "images": 1071
+    },
+    "Tomato___Tomato_mosaic_virus": {
+      "precision": 1.0,
+      "rappel": 1.0,
+      "images": 74
+    },
+    "Tomato___healthy": {
+      "precision": 1.0,
+      "rappel": 0.9969,
+      "images": 318
+    }
+  },
+  "classes": [
+    "Tomato___Bacterial_spot",
+    "Tomato___Early_blight",
+    "Tomato___Late_blight",
+    "Tomato___Leaf_Mold",
+    "Tomato___Septoria_leaf_spot",
+    "Tomato___Spider_mites Two-spotted_spider_mite",
+    "Tomato___Target_Spot",
+    "Tomato___Tomato_Yellow_Leaf_Curl_Virus",
+    "Tomato___Tomato_mosaic_virus",
+    "Tomato___healthy"
+  ],
+  "confusion": [
+    [
+      423,
+      0,
+      0,
+      0,
+      0,
+      0,
+      2,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      197,
+      1,
+      0,
+      0,
+      0,
+      2,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      1,
+      376,
+      0,
+      4,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      190,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      1,
+      0,
+      0,
+      353,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      330,
+      5,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      279,
+      0,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1070,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      74,
+      0
+    ],
+    [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      317
+    ]
+  ]
+}
