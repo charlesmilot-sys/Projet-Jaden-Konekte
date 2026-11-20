@@ -7,3 +7,6 @@
 !ia/cnn/modele/classes.json
 !ia/cnn/modele/tomate_mobilenetv3.onnx
 !ia/cnn/modele/tomate_mobilenetv3.onnx.data
+!assistant/
+!ia/rag/fiches/
+!ia/rag/questions_reference.json

@@ -121,6 +121,25 @@
         <h3 class="sous-titre">Mes derniers diagnostics</h3>
         <ul id="diag-liste" class="diag-liste"></ul>
       </section>
+
+      <section class="assistant" aria-labelledby="titre-assistant">
+        <h2 id="titre-assistant">Assistant agronome</h2>
+        <p class="discret">Il répond à partir des fiches techniques du projet et cite ses sources. Pour un traitement, demandez toujours conseil à un technicien.</p>
+        <form id="form-assistant" class="question">
+          <label for="question" class="visuellement-cache">Votre question</label>
+          <input id="question" type="text" maxlength="500" placeholder="Ex. : comment reconnaître le mildiou ?" autocomplete="off" required>
+          <button id="demander" type="submit" class="bouton-principal">Demander</button>
+        </form>
+        <div id="exemples" class="exemples" aria-label="Exemples de questions">
+          <button type="button" class="bouton-discret">À partir de quelle humidité du sol faut-il arroser ?</button>
+          <button type="button" class="bouton-discret">Quel insecte transmet le virus des feuilles jaunes en cuillère ?</button>
+          <button type="button" class="bouton-discret">Faut-il arroser si une averse est prévue ?</button>
+        </div>
+        <div id="reponse-assistant" class="reponse" aria-live="polite" hidden>
+          <p id="reponse-texte" class="reponse-texte"></p>
+          <ul id="reponse-sources" class="sources"></ul>
+        </div>
+      </section>
     </main>
   </div>
 </body>

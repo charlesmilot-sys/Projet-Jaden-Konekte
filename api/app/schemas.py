@@ -209,3 +209,10 @@ class PageDiagnostics(BaseModel):
 
 class Confirmation(BaseModel):
     confirme: bool
+
+
+# --- Assistant agronome ----------------------------------------------------------
+
+class QuestionAssistant(BaseModel):
+    question: str = Field(min_length=3, max_length=500,
+                          examples=["Comment reconnaître le mildiou sur la tomate ?"])

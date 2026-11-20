@@ -64,7 +64,8 @@ services:
       MQTT_UTILISATEUR: api
       MQTT_MOT_DE_PASSE: ${MQTT_MDP_API}
       INFERENCE_URL: http://inference:8001
-      SEUIL_CONFIANCE: "0.6"
+      SEUIL_CONFIANCE: "0.7"            # même seuil que la fiche « protocole d'alerte »
+      ASSISTANT_URL: http://assistant:8002
     ports:
       - "8000:8000"
     volumes:
@@ -76,6 +77,22 @@ services:
         condition: service_started
       inference:
         condition: service_started
+      assistant:
+        condition: service_started
+
+  assistant:
+    build:
+      context: ..
+      dockerfile: assistant/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      GROQ_API_KEY: ${GROQ_API_KEY:?à définir dans infra/.env}
+      GROQ_MODELE: ${GROQ_MODELE:-openai/gpt-oss-120b}
+    # Aucun port publié : seule l'API l'appelle, après avoir vérifié le jeton
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
 
   inference:
     build:

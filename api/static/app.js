@@ -436,6 +436,10 @@ function afficherDiagnostic(diag) {
 
   const actions = document.createElement("div");
   actions.className = "diag-actions";
+  if (diag.classe !== SAINE) {
+    actions.append(bouton("Que faire ?", "bouton-secondaire", () =>
+      demanderAssistant(`Le diagnostic indique ${diag.libelle} sur mes tomates : que faire ?`)));
+  }
   if (diag.confirme === null) {
     const oui = bouton("C'est bien ça", "bouton-principal", () => confirmer(diag.id, true));
     const non = bouton("Ce n'est pas ça", "bouton-secondaire", () => confirmer(diag.id, false));
@@ -502,6 +506,98 @@ async function chargerDiagnostics() {
     }
   } catch (err) {
     liste.replaceChildren(Object.assign(document.createElement("li"), { textContent: err.message }));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Assistant agronome (réponse en streaming SSE, lue avec fetch comme le flux temps réel)
+// ---------------------------------------------------------------------------
+
+const NOMS_FICHES = {
+  "01_tomate_culture.md": "Tomate : culture",
+  "02_tomate_maladies.md": "Tomate : maladies et ravageurs",
+  "03_igname.md": "Igname",
+  "04_christophine.md": "Christophine",
+  "05_irrigation_sol.md": "Arrosage et humidité du sol",
+  "06_protocole_alerte.md": "Que faire en cas de maladie détectée ?",
+};
+
+$("form-assistant").addEventListener("submit", (e) => {
+  e.preventDefault();
+  demanderAssistant($("question").value.trim());
+});
+for (const b of $("exemples").children) {
+  b.addEventListener("click", () => demanderAssistant(b.textContent));
+}
+
+async function demanderAssistant(question) {
+  if (question.length < 3) return;
+  $("question").value = question;
+  $("titre-assistant").scrollIntoView({ behavior: "smooth", block: "start" });
+  const zone = $("reponse-assistant"), texte = $("reponse-texte"), sources = $("reponse-sources");
+  zone.hidden = false;
+  zone.classList.remove("hors-fiches");
+  texte.textContent = "L'assistant cherche dans les fiches…";
+  texte.classList.add("attente");
+  sources.replaceChildren();
+  $("demander").disabled = true;
+
+  let premier = true;
+  try {
+    const reponse = await fetch(API + "/assistant/questions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${etat.jeton}` },
+      body: JSON.stringify({ question }),
+    });
+    if (!reponse.ok) {
+      const corps = await reponse.json().catch(() => null);
+      throw new Error(corps?.detail || `Erreur ${reponse.status}`);
+    }
+    const lecteur = reponse.body.pipeThrough(new TextDecoderStream()).getReader();
+    let tampon = "";
+    for (;;) {
+      const { value, done } = await lecteur.read();
+      if (done) break;
+      tampon += value;
+      const blocs = tampon.split("\n\n");      // un événement SSE se termine par une ligne vide
+      tampon = blocs.pop();
+      for (const bloc of blocs) {
+        const nom = bloc.match(/^event: (.*)$/m)?.[1];
+        const donnees = bloc.match(/^data: (.*)$/m)?.[1];
+        if (!donnees) continue;
+        const d = JSON.parse(donnees);
+        if (nom === "texte") {
+          if (premier) { texte.textContent = ""; texte.classList.remove("attente"); premier = false; }
+          texte.textContent += d.t;
+        } else if (nom === "fin") {
+          afficherSources(d);
+        } else if (nom === "erreur") {
+          throw new Error(d.detail);
+        }
+      }
+    }
+  } catch (err) {
+    texte.classList.remove("attente");
+    texte.textContent = err.message;
+    zone.classList.add("hors-fiches");
+  } finally {
+    $("demander").disabled = false;
+  }
+}
+
+function afficherSources({ hors_fiches, sources }) {
+  const liste = $("reponse-sources");
+  if (hors_fiches) {
+    $("reponse-assistant").classList.add("hors-fiches");
+    return;
+  }
+  for (const s of sources) {
+    const li = document.createElement("li");
+    li.append(
+      Object.assign(document.createElement("strong"), { textContent: `[${s.numero}] ` }),
+      document.createTextNode(`Fiche « ${NOMS_FICHES[s.source] || s.source} », section « ${s.section} »`),
+    );
+    liste.append(li);
   }
 }
 

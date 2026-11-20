@@ -13,4 +13,7 @@ MQTT_MOT_DE_PASSE = os.environ.get("MQTT_MOT_DE_PASSE")
 # Diagnostic par image
 INFERENCE_URL = os.environ.get("INFERENCE_URL", "http://inference:8001")
 DOSSIER_IMAGES = os.environ.get("DOSSIER_IMAGES", "/donnees/images")
-SEUIL_CONFIANCE = float(os.environ.get("SEUIL_CONFIANCE", "0.6"))
+SEUIL_CONFIANCE = float(os.environ.get("SEUIL_CONFIANCE", "0.7"))
+
+# Assistant agronome (RAG)
+ASSISTANT_URL = os.environ.get("ASSISTANT_URL", "http://assistant:8002")
