@@ -111,7 +111,9 @@ select, input { border: 1px solid var(--trait); background: var(--surface); padd
 .message.ko { color: var(--alerte); }
 
 .auto { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--trait); display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; justify-content: space-between; }
-.auto p { flex: 1 1 16rem; }
+.auto > div { flex: 1 1 16rem; }
+.decision { margin-top: .5rem; font-size: .9rem; color: var(--discret); }
+.decision strong { color: var(--encre); }
 
 /* --- Relevés --- */
 .releves dl { margin: 0; display: grid; gap: .5rem; }

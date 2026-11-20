@@ -288,7 +288,21 @@ function afficherRegle() {
     : "Arrosage automatique désactivé.";
   bouton.textContent = r.active ? "Désactiver l'arrosage automatique" : "Activer l'arrosage automatique";
   bouton.hidden = false;
+
+  // Pourquoi la règle arrose ou non : sa dernière décision, avec la pluie prévue (Open-Meteo)
+  const decision = $("regle-decision");
+  decision.replaceChildren();
+  if (r.active && r.derniere_decision && r.derniere_evaluation) {
+    const heure = new Intl.DateTimeFormat("fr-FR", { timeStyle: "short" }).format(new Date(r.derniere_evaluation));
+    decision.append(
+      Object.assign(document.createElement("strong"), { textContent: `Dernière vérification (${heure}) : ` }),
+      document.createTextNode(r.derniere_decision),
+    );
+  }
 }
+
+// La règle est vérifiée toutes les 30 s par le service regles : on relit sa décision au même rythme
+setInterval(() => { if (etat.jeton && etat.parcelle) chargerRegle(etat.parcelle); }, 30000);
 
 $("regle-bascule").addEventListener("click", async () => {
   try {

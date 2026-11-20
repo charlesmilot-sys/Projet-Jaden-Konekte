@@ -179,6 +179,9 @@ class Regle(BaseModel):
     active: bool
     delai_min_s: int
     derniere_execution: datetime | None = None
+    derniere_evaluation: datetime | None = Field(None, description="Dernière vérification de la règle")
+    derniere_decision: str | None = Field(None, examples=[
+        "Pas d'arrosage : pluie_6h = 4.2 mm prévus, arrosage inutile (pluie prévue sur 6 h : 4,2 mm)"])
 
 
 # --- Diagnostics ----------------------------------------------------------------

@@ -81,6 +81,8 @@ CREATE TABLE regle (
   active      BOOLEAN NOT NULL DEFAULT true,
   delai_min_s INT NOT NULL DEFAULT 7200 CHECK (delai_min_s >= 0),   -- délai minimal entre deux déclenchements (s)
   derniere_execution TIMESTAMPTZ,
+  derniere_evaluation TIMESTAMPTZ,              -- dernière vérification par le service regles
+  derniere_decision   TEXT,                     -- sa décision, lisible (affichée au tableau de bord)
   UNIQUE (parcelle)
 );
 
@@ -143,3 +145,12 @@ CREATE TABLE passage (
   contenu     TEXT NOT NULL,
   embedding   vector(384)
 );
+
+-- Index sur les clés étrangères les plus consultées (la clé primaire (capteur, ts) de mesure
+-- sert déjà aux requêtes « dernière mesure d'un capteur » et aux agrégats par intervalle)
+CREATE INDEX parcelle_exploitation_idx ON parcelle (exploitation);
+CREATE INDEX capteur_parcelle_idx ON capteur (parcelle);
+CREATE INDEX equipement_parcelle_idx ON equipement (parcelle);
+CREATE INDEX commande_equipement_idx ON commande (equipement, cree_le DESC);
+CREATE INDEX diagnostic_auteur_idx ON diagnostic (auteur, cree_le DESC);
+CREATE INDEX historique_exploitation_idx ON historique (exploitation, ts DESC);

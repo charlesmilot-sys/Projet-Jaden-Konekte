@@ -11,7 +11,8 @@ from app.securite import UtilisateurCourant
 
 router = APIRouter(prefix="/api/v1/parcelles", tags=["Règles"])
 
-COLONNES = "id, parcelle, nom, condition, action, active, delai_min_s, derniere_execution"
+COLONNES = ("id, parcelle, nom, condition, action, active, delai_min_s, derniere_execution, "
+            "derniere_evaluation, derniere_decision")
 
 
 def _valeur(champ: str, valeur):

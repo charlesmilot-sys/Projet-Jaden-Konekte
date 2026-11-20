@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app import erreurs, mqtt
+from app.amorcage import amorcer
 from app.db import pool
 from app.routes import assistant, auth, diagnostics, flux, mesures, parcelles, regles, vanne
 
@@ -12,6 +13,7 @@ from app.routes import assistant, auth, diagnostics, flux, mesures, parcelles, r
 @asynccontextmanager
 async def cycle_de_vie(app: FastAPI):
     await pool.open()
+    await amorcer()
     mqtt.demarrer()
     yield
     mqtt.arreter()

@@ -47,25 +47,41 @@ DERNIERES_MESURES = """
 """
 
 
+def noter(conn: psycopg.Connection, r: dict, decision: str, previsions: dict | None) -> None:
+    """Enregistre la décision, avec la pluie prévue, pour que le tableau de bord explique la règle."""
+    if previsions is None:
+        meteo_txt = "prévision météo indisponible"
+    else:
+        meteo_txt = f"pluie prévue sur 6 h : {previsions['pluie_6h']:.1f} mm".replace(".", ",")
+    conn.execute(
+        "UPDATE regle SET derniere_evaluation = now(), derniere_decision = %s WHERE id = %s",
+        (f"{decision} ({meteo_txt})", r["id"]),
+    )
+
+
 def evaluer_regle(conn: psycopg.Connection, client: mqtt.Client, r: dict) -> None:
     prefixe = f"Règle {r['id']} ({r['exploitation_code']}/{r['parcelle_code']})"
+    previsions = meteo.previsions(r["lat"], r["lon"])     # mise en cache 30 min : appel peu coûteux
 
     if not r["delai_ecoule"]:
         log.debug("%s : délai minimal non écoulé", prefixe)
+        noter(conn, r, "Pas d'arrosage : dernier arrosage trop récent (délai minimal)", previsions)
         return
     if r["vanne"] is None or not r["en_ligne"]:
         log.info("%s : vanne absente ou hors ligne, règle ignorée", prefixe)
+        noter(conn, r, "Pas d'arrosage : vanne hors ligne", previsions)
         return
     if r["vanne_etat"] == "ouverte":
         log.debug("%s : vanne déjà ouverte", prefixe)
+        noter(conn, r, "Vanne déjà ouverte", previsions)
         return
 
     mesures = {l["nom"]: l["valeur"] for l in conn.execute(DERNIERES_MESURES, (r["parcelle"],)) if l["valide"]}
-    previsions = meteo.previsions(r["lat"], r["lon"])
     declencher, raison = evaluer(r["condition"], mesures, previsions)
 
     if not declencher:
         log.info("%s : pas d'arrosage (%s)", prefixe, raison)
+        noter(conn, r, f"Pas d'arrosage : {raison}", previsions)
         return
 
     action = r["action"]
@@ -98,6 +114,7 @@ def evaluer_regle(conn: psycopg.Connection, client: mqtt.Client, r: dict) -> Non
         log.error("%s : publication MQTT impossible", prefixe)
         return
     log.info("%s : ARROSAGE %d s (%s) -> %s", prefixe, duree_s, raison, commande_id)
+    noter(conn, r, f"Arrosage lancé pour {duree_s // 60} min : {raison}", previsions)
 
 
 def main() -> None:

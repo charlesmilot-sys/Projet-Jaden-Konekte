@@ -1,6 +1,7 @@
-# Pile de départ Jaden Konekté : broker MQTT + base de séries temporelles.
-# Ajoutez vos propres services (api, ingestion, inference, worker, front…) dans ce fichier.
-#   docker compose up -d
+# Plateforme Jaden Konekté : toute la pile démarre avec
+#   docker compose up -d --build
+# Tableau de bord : http://localhost:8000   Documentation de l'API : http://localhost:8000/docs
+# Tests : docker compose --profile tests run --rm tests
 services:
   mqtt:
     image: eclipse-mosquitto:2
@@ -40,10 +41,12 @@ services:
     ports:
       - "5432:5432"
     volumes:
+      # Exécutés une seule fois, à la création de la base (volume vide), dans l'ordre des noms
       - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./sql/demo.sql:/docker-entrypoint-initdb.d/02-demo.sql:ro
       - db-data:/home/postgres/pgdata/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jaden"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       retries: 10
 
@@ -53,7 +56,7 @@ services:
               "--user", "sim-expl-1", "--password", "${MQTT_MDP_SIMULATEUR}",
               "--exploitation", "expl-1", "--parcelles", "p1", "p2", "p3"]
     depends_on: [mqtt]
-    profiles: ["simu"]     # docker compose --profile simu up -d
+    restart: unless-stopped
 
   api:
     build: ../api
@@ -66,6 +69,9 @@ services:
       INFERENCE_URL: http://inference:8001
       SEUIL_CONFIANCE: "0.7"            # même seuil que la fiche « protocole d'alerte »
       ASSISTANT_URL: http://assistant:8002
+      ADMIN_COURRIEL: ${ADMIN_COURRIEL:-}
+      ADMIN_MOT_DE_PASSE: ${ADMIN_MOT_DE_PASSE:-}
+      DEMO_MOT_DE_PASSE: ${DEMO_MOT_DE_PASSE:-}
     ports:
       - "8000:8000"
     volumes:
