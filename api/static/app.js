@@ -176,6 +176,10 @@ function afficherEtat({ mesures, vanne }) {
   const h = mesures.humidite;
   $("humidite").textContent = h ? nombre(h.valeur) : "–";
   $("humidite-ts").textContent = h ? `Mesure du ${format.format(new Date(h.ts))}` : "Pas encore de mesure valide";
+  // Capteur en panne : la valeur affichée est la dernière fiable, et la règle n'arrose pas
+  const panne = !!h && h.fiable === false;
+  $("capteur-panne").hidden = !panne;
+  document.querySelector(".sol").classList.toggle("panne", panne);
   $("eau").style.height = h ? `${Math.min(100, Math.max(0, h.valeur))}%` : "0";
   document.querySelector(".sol").classList.toggle("sec", !!h && h.valeur < etat.seuil);
 

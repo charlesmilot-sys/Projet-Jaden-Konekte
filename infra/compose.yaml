@@ -132,6 +132,14 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  tests:
+    build: ../tests
+    volumes:
+      - ..:/depot:ro                    # le code testé, en lecture seule
+    environment:
+      API_URL: http://api:8000
+    profiles: ["tests"]                 # docker compose --profile tests run --rm tests
+
 volumes:
   mqtt-data:
   db-data:

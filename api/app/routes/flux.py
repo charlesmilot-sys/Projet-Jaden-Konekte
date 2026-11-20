@@ -21,13 +21,18 @@ async def lire_etat(parcelle_id: int) -> EtatParcelle:
     async with pool.connection() as conn:
         cur = await conn.execute(
             """
-            SELECT c.grandeur, c.unite, m.valeur, m.ts
+            SELECT c.grandeur, c.unite, m.valeur, m.ts, d.valide AS fiable
             FROM capteur c
+            -- dernière mesure VALIDE : la valeur affichée
             JOIN LATERAL (
                 SELECT valeur, ts FROM mesure
                 WHERE capteur = c.id AND valide
                 ORDER BY ts DESC LIMIT 1
             ) m ON true
+            -- dernière mesure reçue, valide ou non : si elle est invalide, le capteur est en panne
+            JOIN LATERAL (
+                SELECT valide FROM mesure WHERE capteur = c.id ORDER BY ts DESC LIMIT 1
+            ) d ON true
             WHERE c.parcelle = %s AND c.actif
             """,
             (parcelle_id,),

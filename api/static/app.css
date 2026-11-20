@@ -93,6 +93,9 @@ select, input { border: 1px solid var(--trait); background: var(--surface); padd
 .chiffre { font-size: 4rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
 .chiffre small { font-size: 1.5rem; color: var(--discret); }
 .sol.sec .chiffre { color: var(--terre); }
+.sol.panne .chiffre { color: var(--discret); }
+.sol.panne .eau { opacity: .35; }
+#capteur-panne { margin-top: .75rem; max-width: 22rem; font-size: .9rem; }
 .statut { margin-top: .75rem; font-weight: 700; }
 .statut.en-ligne { color: var(--ok); }
 .statut.hors-ligne { color: var(--alerte); }

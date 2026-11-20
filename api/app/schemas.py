@@ -106,9 +106,11 @@ class Commande(BaseModel):
 # --- Flux temps réel ------------------------------------------------------------
 
 class ValeurCourante(BaseModel):
-    valeur: float
+    valeur: float = Field(description="Dernière valeur VALIDE")
     unite: str
     ts: datetime
+    fiable: bool = Field(True, description="False si la dernière mesure reçue a été rejetée "
+                                           "(capteur en panne) : la valeur affichée est alors ancienne")
 
 
 class EtatParcelle(BaseModel):
