@@ -454,7 +454,8 @@ function afficherDiagnostic(diag) {
 
   const actions = document.createElement("div");
   actions.className = "diag-actions";
-  if (diag.classe !== SAINE) {
+  // « Que faire ? » seulement pour une maladie détectée avec confiance et non démentie par l'exploitant
+  if (diag.classe !== SAINE && diag.fiable && diag.confirme !== false) {
     actions.append(bouton("Que faire ?", "bouton-secondaire", () =>
       demanderAssistant(`Le diagnostic indique ${diag.libelle} sur mes tomates : que faire ?`)));
   }
