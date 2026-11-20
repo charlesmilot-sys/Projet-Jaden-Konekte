@@ -48,7 +48,9 @@ select, input { border: 1px solid var(--trait); background: var(--surface); padd
 .accroche { color: var(--discret); margin-bottom: 1.5rem; }
 .connexion form { display: grid; gap: .4rem; }
 .connexion label { font-weight: 700; margin-top: .5rem; }
-.connexion button { margin-top: 1rem; }
+.connexion button[type="submit"] { margin-top: 1rem; }
+.bascule-compte { margin-top: 1rem; color: var(--discret); }
+.bascule-compte .bouton-discret { padding: 0; color: var(--eau); }
 
 /* --- Barre --- */
 .barre {

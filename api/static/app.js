@@ -39,7 +39,9 @@ async function api(chemin, options = {}) {
   const corps = await reponse.json().catch(() => null);
   if (!reponse.ok) {
     // Les erreurs de l'API sont au format Problem Details : on affiche "detail"
-    throw new Error(corps?.detail || `Erreur ${reponse.status}`);
+    const erreur = new Error(corps?.detail || `Erreur ${reponse.status}`);
+    erreur.corps = corps;          // détail par champ pour les erreurs 422
+    throw erreur;
   }
   return corps;
 }
@@ -61,6 +63,47 @@ $("form-connexion").addEventListener("submit", async (e) => {
     await ouvrirTableau();
   } catch (err) {
     $("erreur-connexion").textContent = err.message;
+  }
+});
+
+// Inscription : crée toujours un compte exploitant, puis connecte directement
+function montrerFormulaire(inscription) {
+  $("form-connexion").hidden = inscription;
+  $("form-inscription").hidden = !inscription;
+  $("erreur-connexion").textContent = "";
+  $("erreur-inscription").textContent = "";
+  $(inscription ? "ins-prenom" : "courriel").focus();
+}
+$("vers-inscription").addEventListener("click", () => montrerFormulaire(true));
+$("vers-connexion").addEventListener("click", () => montrerFormulaire(false));
+
+$("form-inscription").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const erreur = $("erreur-inscription");
+  erreur.textContent = "";
+  const courriel = $("ins-courriel").value.trim();
+  const mot_de_passe = $("ins-mdp").value;
+  if (mot_de_passe.length < 8) {
+    erreur.textContent = "Le mot de passe doit contenir au moins 8 caractères.";
+    return;
+  }
+  try {
+    await api("/utilisateurs", {
+      method: "POST",
+      body: JSON.stringify({ prenom: $("ins-prenom").value.trim(), nom: $("ins-nom").value.trim(),
+                             courriel, mot_de_passe }),
+    });
+    const jeton = await api("/jetons", { method: "POST", body: JSON.stringify({ courriel, mot_de_passe }) });
+    etat.jeton = jeton.access_token;
+    sessionStorage.setItem("jeton", etat.jeton);
+    $("form-inscription").reset();
+    montrerFormulaire(false);
+    await ouvrirTableau();
+  } catch (err) {
+    // 409 : courriel déjà utilisé ; 422 : l'API indique le champ invalide
+    const NOMS = { prenom: "Prénom", nom: "Nom", courriel: "Courriel", mot_de_passe: "Mot de passe" };
+    const champs = (err.corps?.erreurs || []).map((x) => NOMS[x.champ.split(".").pop()]).filter(Boolean);
+    erreur.textContent = champs.length ? `Champ à corriger : ${[...new Set(champs)].join(", ")}.` : err.message;
   }
 });
 
@@ -570,7 +613,9 @@ async function demanderAssistant(question) {
     });
     if (!reponse.ok) {
       const corps = await reponse.json().catch(() => null);
-      throw new Error(corps?.detail || `Erreur ${reponse.status}`);
+      const erreur = new Error(corps?.detail || `Erreur ${reponse.status}`);
+    erreur.corps = corps;          // détail par champ pour les erreurs 422
+    throw erreur;
     }
     const lecteur = reponse.body.pipeThrough(new TextDecoderStream()).getReader();
     let tampon = "";

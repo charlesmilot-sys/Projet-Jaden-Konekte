@@ -24,6 +24,22 @@
       <input id="mot-de-passe" type="password" autocomplete="current-password" required>
       <button type="submit" class="bouton-principal">Se connecter</button>
       <p id="erreur-connexion" class="erreur" role="alert"></p>
+      <p class="bascule-compte">Pas encore de compte ? <button type="button" id="vers-inscription" class="bouton-discret">Créer un compte</button></p>
+    </form>
+
+    <form id="form-inscription" novalidate hidden>
+      <label for="ins-prenom">Prénom</label>
+      <input id="ins-prenom" type="text" autocomplete="given-name" maxlength="40" required>
+      <label for="ins-nom">Nom</label>
+      <input id="ins-nom" type="text" autocomplete="family-name" maxlength="40" required>
+      <label for="ins-courriel">Courriel</label>
+      <input id="ins-courriel" type="email" autocomplete="email" maxlength="120" required>
+      <label for="ins-mdp">Mot de passe</label>
+      <input id="ins-mdp" type="password" autocomplete="new-password" minlength="8" maxlength="128" required aria-describedby="aide-mdp">
+      <small id="aide-mdp" class="discret">8 caractères au moins.</small>
+      <button type="submit" class="bouton-principal">Créer mon compte</button>
+      <p id="erreur-inscription" class="erreur" role="alert"></p>
+      <p class="bascule-compte">Déjà un compte ? <button type="button" id="vers-connexion" class="bouton-discret">Se connecter</button></p>
     </form>
   </main>
 
