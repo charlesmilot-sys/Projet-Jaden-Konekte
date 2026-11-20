@@ -2,8 +2,13 @@ openapi: 3.1.0
 
 info:
   title: Jaden Konekté API
-  version: 1.0.0
-  description: Suivi des jardins connectés (capteurs, arrosage, diagnostic, assistant).
+  version: 1.1.0
+  description: |
+    Suivi des jardins connectés (capteurs, arrosage, diagnostic, assistant).
+
+    Version 1.1.0 : contrat initial (1.0.0, rédigé avant l'implémentation) mis à jour après comparaison
+    avec la spécification générée par FastAPI. Les écarts et leurs raisons sont listés dans ecarts_contrat.md.
+
 
 servers:
   - url: http://localhost:8000
@@ -11,7 +16,7 @@ servers:
 paths:
   /api/v1/parcelles:
     get:
-      summary: Liste de mes parcelles 
+      summary: Liste de mes parcelles
       tags: [Parcelles]
       parameters:
         - name: page
@@ -24,7 +29,7 @@ paths:
         - name: taille
           in: query
           required: false
-          schema: 
+          schema:
             type: integer
             minimum: 1
             maximum: 100
@@ -32,9 +37,9 @@ paths:
       responses:
         '200':
           description: Une page de parcelles
-          content: 
+          content:
             application/json:
-              schema: 
+              schema:
                 type: object
                 required: [elements, page, taille, total]
                 properties:
@@ -53,6 +58,8 @@ paths:
 
                 
           
+        '422':
+          $ref: '#/components/responses/DonneesInvalides'
   /api/v1/parcelles/{id}:
     get:
       summary: Détail d'une parcelle
@@ -75,6 +82,8 @@ paths:
         '404':
           $ref: '#/components/responses/Introuvable'
 
+        '422':
+          $ref: '#/components/responses/DonneesInvalides'
   /api/v1/parcelles/{id}/commandes:
     post:
       summary: Envoyer un ordre à la vanne
@@ -83,7 +92,7 @@ paths:
         - name: id
           in: path
           required: true
-          schema: 
+          schema:
             type: integer
       requestBody:
         required: true
@@ -93,7 +102,7 @@ paths:
               type: object
               required: [action]
               properties:
-                action: 
+                action:
                   type: string
                   enum: [ouvrir, fermer]
                 duree_s:
@@ -104,11 +113,10 @@ paths:
       responses:
         '202':
           description: Ordre publié, en attende de confirmation de la vanne
-          content: 
+          content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Commande'
-              
         '401':
           $ref: '#/components/responses/NonAuthentifie'
         '404':
@@ -118,29 +126,31 @@ paths:
         '422':
           $ref: '#/components/responses/DonneesInvalides'
 
+        '503':
+          $ref: '#/components/responses/ServiceIndisponible'
   /api/v1/jetons:
     post:
       summary: Connexion
       tags: [Authentification]
       security: []
-      requestBody: 
+      requestBody:
         required: true
-        content: 
-          application/json: 
+        content:
+          application/json:
             schema:
               type: object
               required: [courriel, mot_de_passe]
-              properties: 
+              properties:
                 courriel:
                   type: string
                   format: email
                 mot_de_passe:
                   type: string
                   format: password
-      responses: 
-        '200': 
+      responses:
+        '200':
           description: connexion réussie, jeton d'accès JWT
-          content: 
+          content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Jeton'
@@ -156,9 +166,9 @@ paths:
       security: []
       requestBody:
         required: true
-        content: 
+        content:
           application/json:
-            schema: 
+            schema:
               type: object
               required: [nom, prenom, courriel, mot_de_passe]
               properties:
@@ -180,11 +190,10 @@ paths:
       responses:
         '201':
           description: inscription reussie
-          content: 
+          content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Utilisateur'
-        
         '409':
           $ref: '#/components/responses/Conflit'
         '422':
@@ -192,16 +201,15 @@ paths:
 
   /api/v1/utilisateurs/moi:
     get:
-      summary: Profil de l'utilisateur connecté 
+      summary: Profil de l'utilisateur connecté
       tags: [Authentification]
-      responses: 
-        '200': 
+      responses:
+        '200':
           description: L'utilisateur identifié par le jeton
-          content: 
+          content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Utilisateur'
-        
         '401':
           $ref: '#/components/responses/NonAuthentifie'
 
@@ -209,8 +217,8 @@ paths:
   
   /api/v1/diagnostics:
     get:
-      summary: Liste de mes diagnostics (paginée) 
-      tags: [Diagnostics] 
+      summary: Liste de mes diagnostics (paginée)
+      tags: [Diagnostics]
       parameters:
         - name: page
           in: query
@@ -222,14 +230,14 @@ paths:
         - name: taille
           in: query
           required: false
-          schema: 
+          schema:
             type: integer
             minimum: 1
             maximum: 100
             default: 20
       responses:
         '200':
-          description: Une page de diagnostics                
+          description: Une page de diagnostics
           content:
             application/json:
               schema:
@@ -239,7 +247,7 @@ paths:
                   elements:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Diagnostic'   
+                      $ref: '#/components/schemas/Diagnostic'
                   page:
                     type: integer
                   taille:
@@ -248,7 +256,8 @@ paths:
                     type: integer
         '401':
           $ref: '#/components/responses/NonAuthentifie'
-      
+        '422':
+          $ref: '#/components/responses/DonneesInvalides'
     post:
       summary: Envoie d'une photo de feuille
       tags: [Diagnostics]
@@ -260,22 +269,22 @@ paths:
               type: object
               required: [image]
               properties:
-                image: 
+                image:
                   type: string
                   format: binary
-                  description: Photo JPEG ou PNG, 5 Mo max 
+                  description: Photo JPEG ou PNG, 5 Mo max
                 parcelle:
                   type: integer
                   description: Parcelle concernée
-            encoding: 
-              image: 
+            encoding:
+              image:
                 contentType: image/jpeg, image/png
-      responses: 
+      responses:
         '201':
           description: Diagnostic réalisé
-          content: 
+          content:
             application/json:
-              schema: 
+              schema:
                 $ref: '#/components/schemas/Diagnostic'
         '401':
           $ref: '#/components/responses/NonAuthentifie'
@@ -295,7 +304,8 @@ paths:
                 $ref: '#/components/schemas/Probleme'
         '422':
           $ref: '#/components/responses/DonneesInvalides'
-    
+        '503':
+          $ref: '#/components/responses/ServiceIndisponible'
   /api/v1/diagnostics/{id}:
     get:
       summary: Détail d'un diagnostic
@@ -306,18 +316,81 @@ paths:
           required: true
           schema:
             type: integer
-      responses:      
+      responses:
         '200':
           description: Le diagnostic
-          content: 
+          content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Diagnostic'
         '401':
           $ref: '#/components/responses/NonAuthentifie'
         '404':
-          $ref: '#/components/responses/Introuvable' 
+          $ref: '#/components/responses/Introuvable'
 
+        '422':
+          $ref: '#/components/responses/DonneesInvalides'
+    patch:
+      summary: Confirmer ou infirmer un diagnostic (validation par l'exploitant)
+      tags:
+        - Diagnostics
+      parameters: &id001
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - confirme
+              properties:
+                confirme:
+                  type: boolean
+      responses:
+        '200':
+          description: Le diagnostic mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Diagnostic'
+        '401': &id002
+          $ref: '#/components/responses/NonAuthentifie'
+        '404': &id003
+          $ref: '#/components/responses/Introuvable'
+        '422': &id004
+          $ref: '#/components/responses/DonneesInvalides'
+        '409':
+          description: Seul un diagnostic terminé peut être confirmé
+          content: &id005
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Probleme'
+  /api/v1/diagnostics/{id}/image:
+    get:
+      summary: Photo envoyée pour un diagnostic
+      tags:
+        - Diagnostics
+      parameters: *id001
+      responses:
+        '200':
+          description: La photo (JPEG ou PNG)
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '401': *id002
+        '404': *id003
+        '422': *id004
   /api/v1/parcelles/{id}/mesures:
     get:
       summary: Historique agrégé d'une grandeur (moyenne, min, max par tranche)
@@ -356,6 +429,30 @@ paths:
         '422':
           $ref: '#/components/responses/DonneesInvalides'
 
+  /api/v1/parcelles/{id}/flux:
+    get:
+      summary: Flux temps réel de la parcelle (Server-Sent Events)
+      tags:
+        - Tableau de bord
+      parameters: *id001
+      description: |
+        Envoie un événement `etat` à la connexion, puis à chaque changement : dernière valeur
+        valide de chaque grandeur (avec `fiable: false` si la dernière mesure reçue a été rejetée)
+        et état de la vanne. Un commentaire `: ping` toutes les 15 s garde la connexion ouverte.
+        Lu avec fetch() côté navigateur pour envoyer l'en-tête Authorization.
+      responses:
+        '200':
+          description: Flux d'événements
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              example: |
+                event: etat
+                data: {"mesures": {"humidite": {"valeur": 31.2, "unite": "%", "ts": "2026-11-20T06:00:00Z", "fiable": true}}, "vanne": {"id": 1, "type": "vanne", "etat": "fermee", "en_ligne": true}}
+        '401': *id002
+        '404': *id003
+        '422': *id004
   /api/v1/parcelles/{id}/equipements:
     get:
       summary: État des équipements de la parcelle (vanne)
@@ -380,6 +477,8 @@ paths:
         '404':
           $ref: '#/components/responses/Introuvable'
 
+        '422':
+          $ref: '#/components/responses/DonneesInvalides'
   /api/v1/parcelles/{id}/regle:
     parameters:
       - name: id
@@ -401,6 +500,8 @@ paths:
           $ref: '#/components/responses/NonAuthentifie'
         '404':
           $ref: '#/components/responses/Introuvable'
+        '422':
+          $ref: '#/components/responses/DonneesInvalides'
     put:
       summary: Créer ou remplacer la règle d'arrosage
       tags: [Règles]
@@ -452,56 +553,49 @@ paths:
         '422':
           $ref: '#/components/responses/DonneesInvalides'
 
-  /api/v1/questions:
+  /api/v1/assistant/questions:
     post:
       summary: Poser une question à l'assistant agronome
-      tags: [Assistant]
+      tags:
+        - Assistant
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [question]
+              required:
+                - question
               properties:
                 question:
                   type: string
                   minLength: 3
-                  maxLength: 1000
+                  maxLength: 500
                   example: Comment reconnaître le mildiou de la tomate ?
       responses:
         '200':
           description: |
-            Réponse en streaming (Server-Sent Events). Trois types d'événements :
-            - `morceau` : `{"texte": "..."}`, un fragment de la réponse, à afficher au fil de l'eau ;
-            - `sources` : `[{"source": "02_tomate_maladies.md", "section": "Mildiou"}]`, les passages utilisés ;
-            - `fin` : `{"hors_fiches": false}`, vaut true si la réponse n'est pas dans les fiches.
+            Réponse en streaming (Server-Sent Events) :
+            - `texte` : `{"t": "..."}`, un fragment de la réponse, à afficher au fil de l'eau ;
+            - `fin` : `{"hors_fiches": false, "sources": [{"numero": 1, "source": "...", "section": "..."}], "modele": "..."}` :
+              les sources réellement citées dans la réponse (numéros entre crochets) ;
+            - `erreur` : `{"detail": "..."}` si le modèle de langage échoue en cours de route.
           content:
             text/event-stream:
               schema:
                 type: string
               example: |
-                event: morceau
-                data: {"texte": "Le mildiou se reconnaît à "}
-
-                event: sources
-                data: [{"source": "02_tomate_maladies.md", "section": "Mildiou"}]
+                event: texte
+                data: {"t": "Le mildiou se reconnaît à "}
 
                 event: fin
-                data: {"hors_fiches": false}
+                data: {"hors_fiches": false, "sources": [{"numero": 1, "source": "02_tomate_maladies.md", "section": "Mildiou"}], "modele": "openai/gpt-oss-120b"}
         '401':
           $ref: '#/components/responses/NonAuthentifie'
         '422':
           $ref: '#/components/responses/DonneesInvalides'
         '503':
-          description: Modèle de langage indisponible
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Probleme'
-        
-
-             
+          $ref: '#/components/responses/ServiceIndisponible'
 components:
   schemas:
     Parcelle:
@@ -535,7 +629,7 @@ components:
           type: integer
         detail:
           type: string
-    
+
     Commande:
       type: object
       required: [id, action, statut, cree_le]
@@ -559,10 +653,10 @@ components:
           type: string
           format: date-time
 
-    Jeton: 
+    Jeton:
       type: object
       required: [access_token, token_type, expires_in]
-      properties: 
+      properties:
         access_token:
           type: string
         token_type:
@@ -585,7 +679,7 @@ components:
         courriel:
           type: string
           format: email
-        role: 
+        role:
           type: string
           enum: [exploitant, administrateur]
 
@@ -593,14 +687,14 @@ components:
       type: object
       required: [id, statut, image_url, cree_le]
       properties:
-        id: 
+        id:
           type: integer
-        parcelle: 
+        parcelle:
           type: [integer, 'null']
-        classe: 
+        classe:
           type: string
           example: Tomato__late_blight
-        libelle: 
+        libelle:
           type: string
           description: Nom de la maladie en français
           example: Mildiou
@@ -624,6 +718,16 @@ components:
           type: string
           format: date-time
 
+        fiable:
+          type:
+            - boolean
+            - 'null'
+          description: Score au-dessus du seuil de confiance (0,7) ; sinon il faut reprendre la photo
+        termine_le:
+          type:
+            - string
+            - 'null'
+          format: date-time
     SerieMesures:
       type: object
       required: [grandeur, unite, periode, intervalle, points]
@@ -802,6 +906,18 @@ components:
           format: date-time
 
 
+        derniere_evaluation:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: Dernière vérification par le service regles
+        derniere_decision:
+          type:
+            - string
+            - 'null'
+          description: Décision lisible de la dernière vérification, avec la pluie prévue
+          example: "Pas d'arrosage : pluie_6h = 4.2 mm prévus, arrosage inutile (pluie prévue sur 6 h : 4,2 mm)"
   responses:
     NonAuthentifie:
       description: Jeton absent, invalide ou expiré
@@ -816,7 +932,6 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Probleme'
-    
     Conflit:
       description: Action impossible dans l'état actuel (ex. objet hors ligne, règle déjà existante)
       content:
@@ -830,6 +945,9 @@ components:
           schema:
             $ref: '#/components/schemas/Probleme'
 
+    ServiceIndisponible:
+      description: Service interne indisponible (broker MQTT, inférence ou assistant)
+      content: *id005
   securitySchemes:
     jwt:
       type: http
