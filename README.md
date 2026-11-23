@@ -66,7 +66,7 @@ Les principaux flux :
 |---|---|---|
 | `mqtt` | `infra/mosquitto` | Broker Mosquitto : comptes par service et ACL |
 | `db` | `infra/sql` | PostgreSQL 16, TimescaleDB (hypertable `mesure`), pgvector (table `passage`) |
-| `simulateur` | `simulateur` | Parcelles simulées (les trois de démonstration, puis celles créées par l'administrateur) : capteurs, vanne, pannes volontaires, temps accéléré ×60 |
+| `simulateur` | `simulateur` | Parcelles simulées (les trois de démonstration, puis celles créées par l'administrateur) : capteurs, vanne, pannes volontaires, temps accéléré ×60 ; l'heure simulée est conservée d'un redémarrage à l'autre (topic retenu `jaden/simulateur/horloge`) |
 | `ingestion` | `ingestion` | Abonné à `jaden/#` : validation des mesures, confirmation des commandes, statut des objets |
 | `regles` | `regles` | Vérifie la règle de chaque parcelle toutes les 30 s (humidité du sol + pluie prévue) |
 | `api` | `api` | API REST (JWT, Problem Details), flux SSE, tableau de bord (`api/static`) |

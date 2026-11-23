@@ -25,6 +25,8 @@ topic write jaden/+/+/pluvio/#
 topic write jaden/+/+/vanne/etat
 topic read jaden/+/+/vanne/cmd
 topic read jaden/+/+/config
+# Heure simulée (message retenu) : publiée à chaque pas, relue au redémarrage
+topic readwrite jaden/simulateur/horloge
 
 # Objet réel (ESP32) d'une parcelle : limité à SA parcelle
 user capteur-p1

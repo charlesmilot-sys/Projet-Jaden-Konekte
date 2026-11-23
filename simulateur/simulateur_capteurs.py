@@ -19,6 +19,8 @@ Topics (voir le sujet, § Conventions MQTT) :
     jaden/<exploitation>/<parcelle>/vanne/cmd                 commandes reçues
     jaden/<exploitation>/<parcelle>/vanne/etat                état de la vanne (retenu)
     jaden/<exploitation>/<parcelle>/statut                    online / offline (LWT, retenu)
+    jaden/simulateur/horloge                                  heure simulée courante (retenu) : au
+                                                              redémarrage, le simulateur repart de là
     jaden/<exploitation>/<parcelle>/config                    parcelle annoncée par l'API (retenu) :
                                                               le simulateur se met à la simuler ;
                                                               un message vide la retire
@@ -35,6 +37,13 @@ import random
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+
+
+# Le temps simulé avance plus vite que le temps réel (×60) : les mesures sont datées dans le futur.
+# Pour qu'un redémarrage ne fasse pas « remonter le temps » (mesures plus anciennes que celles déjà en
+# base, ignorées par l'ingestion), l'heure simulée est publiée en message retenu, et relue au démarrage.
+TOPIC_HORLOGE = "jaden/simulateur/horloge"
+ATTENTE_REPRISE_S = 3
 
 
 # ------------------------------------------------------------------ modèle physique simplifié
@@ -132,6 +141,7 @@ def main() -> None:
     # Clé : (exploitation, parcelle). Les parcelles annoncées par l'API s'ajoutent en cours de route.
     parcelles = {(a.exploitation, n): Parcelle(a.exploitation, n) for n in a.parcelles}
     t_sim = datetime.now(timezone.utc).replace(microsecond=0)
+    reprise: list[datetime] = []   # heure simulée lue sur TOPIC_HORLOGE (message retenu)
     client = None
 
     def publier(topic: str, msg: str, retain: bool = False) -> None:
@@ -157,6 +167,7 @@ def main() -> None:
 
         def on_connect(c, userdata, flags, reason_code, properties):
             print(f"[mqtt] connecté ({reason_code})")
+            c.subscribe(TOPIC_HORLOGE, qos=1)
             for p in list(parcelles.values()):
                 brancher(c, p)
             c.subscribe("jaden/+/+/config", qos=1)
@@ -175,6 +186,12 @@ def main() -> None:
                 print(f"[config] parcelle retirée : {expl}/{nom}")
 
         def on_message(c, userdata, msg):
+            if msg.topic == TOPIC_HORLOGE:
+                try:
+                    reprise.append(datetime.fromisoformat(json.loads(msg.payload)["ts"]))
+                except (ValueError, KeyError, TypeError):
+                    pass
+                return
             morceaux = msg.topic.split("/")
             if morceaux[-1] == "config":
                 annonce(c, morceaux[1], morceaux[2], msg.payload)
@@ -203,6 +220,14 @@ def main() -> None:
         client.connect(a.broker, a.port, keepalive=30)
         client.loop_start()
 
+        # Reprise de l'horloge : on attend le message retenu, puis on repart de l'heure la plus tardive
+        time.sleep(ATTENTE_REPRISE_S)
+        if reprise and max(reprise) > t_sim:
+            t_sim = max(reprise)
+            print(f"[horloge] reprise à {t_sim.isoformat()} (heure simulée du dernier arrêt)")
+        else:
+            print(f"[horloge] départ à l'heure réelle {t_sim.isoformat()}")
+
     n = 0
     try:
         while a.iterations == 0 or n < a.iterations:
@@ -215,6 +240,7 @@ def main() -> None:
                     publier(f"{p.base()}/{capteur}/{grandeur}", payload(v, u, t_sim, f"{p.nom}-{capteur}"))
                 if avant and p.vanne_ouverte_jusqua is None:  # fermeture automatique en fin de durée
                     publier(f"{p.base()}/vanne/etat", etat_vanne(p, t_sim), retain=True)
+            publier(TOPIC_HORLOGE, json.dumps({"ts": t_sim.isoformat(timespec="seconds")}), retain=True)
             n += 1
             time.sleep(0 if a.dry_run else a.periode)
     except KeyboardInterrupt:
