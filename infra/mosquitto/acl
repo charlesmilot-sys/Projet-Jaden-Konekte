@@ -5,19 +5,26 @@
 user ingestion
 topic read jaden/#
 
-# API : publie uniquement les commandes de vanne (manuelles)
+# API : publie les commandes de vanne (manuelles) et l'annonce des parcelles créées par l'administrateur
 user api
 topic write jaden/+/+/vanne/cmd
+topic write jaden/+/+/config
 
 # Service des règles : publie uniquement les commandes de vanne (automatiques)
 user regles
 topic write jaden/+/+/vanne/cmd
 
-# Simulateur des objets de l'exploitation expl-1 (un seul client pour ses 3 parcelles) :
-# publie mesures, statut et état des vannes de expl-1, écoute ses commandes
+# Simulateur des objets (un seul client) : expl-1 au démarrage, puis toute parcelle annoncée par l'API.
+# Il publie mesures, statut et état des vannes, écoute les commandes et les annonces ;
+# il ne peut ni envoyer de commande ni annoncer de parcelle.
 user sim-expl-1
-topic write jaden/expl-1/#
-topic read jaden/expl-1/+/vanne/cmd
+topic write jaden/+/+/statut
+topic write jaden/+/+/sol/#
+topic write jaden/+/+/air/#
+topic write jaden/+/+/pluvio/#
+topic write jaden/+/+/vanne/etat
+topic read jaden/+/+/vanne/cmd
+topic read jaden/+/+/config
 
 # Objet réel (ESP32) d'une parcelle : limité à SA parcelle
 user capteur-p1

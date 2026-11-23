@@ -71,10 +71,28 @@ def test_nouvel_exploitant_ne_voit_aucune_parcelle(client, compte):
     assert r.json()["total"] == 0
 
 
+def test_apercu_limite_a_mes_parcelles(client, compte):
+    """La vue d'ensemble ne montre que les parcelles de l'utilisateur : aucune pour un nouveau compte."""
+    r = client.get("/apercu", headers=compte["entetes"])
+    assert r.status_code == 200
+    assert r.json() == []
+    assert client.get("/apercu").status_code == 401
+
+
+def test_administration_reservee_a_l_admin(client, compte):
+    """Un exploitant ne peut ni créer, ni attribuer une parcelle, ni lister les comptes : 403."""
+    e = compte["entetes"]
+    assert client.get("/utilisateurs", headers=e).status_code == 403
+    r = client.post("/parcelles", headers=e, json={"proprietaire": 1, "nom": "Essai", "culture": "piment"})
+    assert r.status_code == 403
+    assert r.headers["content-type"].startswith("application/problem+json")
+    assert client.patch("/parcelles/1", headers=e, json={"proprietaire": 1}).status_code == 403
+
+
 def test_parcelle_d_un_autre_introuvable(client, compte):
     """Contrôle d'accès au niveau objet : 404 (et non 403) pour ne pas révéler son existence."""
     for chemin in ["/parcelles/1", "/parcelles/1/mesures?grandeur=humidite", "/parcelles/1/equipements",
-                   "/parcelles/1/regle"]:
+                   "/parcelles/1/regle", "/parcelles/1/commandes"]:
         assert client.get(chemin, headers=compte["entetes"]).status_code == 404, chemin
     r = client.post("/parcelles/1/commandes", headers=compte["entetes"], json={"action": "fermer"})
     assert r.status_code == 404

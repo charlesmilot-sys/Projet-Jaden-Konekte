@@ -47,6 +47,25 @@ class Parcelle(BaseModel):
     nom: str = Field(examples=["Carré de tomates"])
     culture: str = Field(examples=["tomate"])
     surface_m2: float | None = None
+    proprietaire: int | None = Field(None, description="Identifiant de l'exploitant")
+    proprietaire_nom: str | None = Field(None, examples=["Marie Joseph"])
+
+
+class ParcelleEntree(BaseModel):
+    """Création par l'administrateur : la parcelle est équipée (4 capteurs, une vanne, une règle)."""
+    proprietaire: int = Field(description="Exploitant à qui la parcelle est attribuée")
+    nom: str = Field(min_length=1, max_length=80, examples=["Carré de piments"])
+    culture: str = Field(min_length=1, max_length=30, examples=["piment"])
+    surface_m2: float | None = Field(None, gt=0, le=100000)
+    seuil: float = Field(30, ge=5, le=70, description="Seuil d'arrosage de la règle (humidité du sol, %)")
+    commune: str | None = Field(None, min_length=1, max_length=80,
+                                description="Requise si l'exploitant n'a pas encore d'exploitation")
+
+
+class Attribution(BaseModel):
+    proprietaire: int = Field(description="Nouvel exploitant de la parcelle")
+    commune: str | None = Field(None, min_length=1, max_length=80,
+                                description="Requise si l'exploitant n'a pas encore d'exploitation")
 
 
 class PageParcelles(BaseModel):
@@ -117,6 +136,27 @@ class EtatParcelle(BaseModel):
     """Ce que le tableau de bord affiche en direct pour une parcelle."""
     mesures: dict[str, ValeurCourante]   # clé : grandeur (humidite, temperature…)
     vanne: Equipement | None
+
+
+# --- Vue d'ensemble ---------------------------------------------------------------
+
+class ApercuParcelle(BaseModel):
+    """Une ligne par parcelle : ce qu'il faut voir d'un coup d'œil."""
+    id: int
+    code: str
+    nom: str
+    culture: str
+    humidite: float | None = Field(None, description="Dernière humidité du sol VALIDE (%)")
+    humidite_ts: datetime | None = None
+    humidite_fiable: bool | None = Field(None, description="False si le capteur d'humidité est en panne")
+    seuil: float | None = Field(None, description="Seuil d'arrosage de la règle (%), null sans règle")
+    regle_active: bool | None = None
+    derniere_decision: str | None = None
+    vanne_etat: Literal["ouverte", "fermee"] | None = None
+    vanne_jusqua: datetime | None = None
+    en_ligne: bool
+    arrosages_24h: int = Field(description="Ouvertures confirmées sur les dernières 24 h")
+    dernier_arrosage: datetime | None = None
 
 
 # --- Règle d'arrosage -------------------------------------------------------------

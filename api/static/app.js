@@ -123,26 +123,47 @@ function deconnecter(message = "") {
 // ---------------------------------------------------------------------------
 
 async function ouvrirTableau() {
-  const page = await api("/parcelles?taille=100");
+  const [page, moi] = await Promise.all([api("/parcelles?taille=100"), api("/utilisateurs/moi")]);
+  etat.moi = moi;
   $("ecran-connexion").hidden = true;
   $("ecran-tableau").hidden = false;
+  $("admin").hidden = moi.role !== "administrateur";
+  $("lien-admin").hidden = moi.role !== "administrateur";
+  if (moi.role === "administrateur") chargerAdmin();
 
+  afficherOnglets(page.elements);
+  if (page.elements.length > 0) choisirParcelle(page.elements[0].id);
+  chargerApercu();
+  chargerDiagnostics();
+}
+
+function afficherOnglets(parcelles) {
   const nav = $("parcelles");
   nav.replaceChildren();
-  if (page.elements.length === 0) {
+  if (parcelles.length === 0) {
     nav.textContent = "Aucune parcelle n'est rattachée à votre compte.";
     return;
   }
-  for (const p of page.elements) {
+  for (const p of parcelles) {
     const bouton = document.createElement("button");
     bouton.textContent = `${p.nom} (${p.culture})`;
     bouton.setAttribute("role", "tab");
     bouton.dataset.id = p.id;
+    bouton.setAttribute("aria-selected", String(p.id === etat.parcelle));
     bouton.addEventListener("click", () => choisirParcelle(p.id));
     nav.append(bouton);
   }
-  choisirParcelle(page.elements[0].id);
-  chargerDiagnostics();
+}
+
+// Après une création ou une attribution : on garde la parcelle affichée si elle existe toujours
+async function rafraichirParcelles() {
+  const page = await api("/parcelles?taille=100");
+  afficherOnglets(page.elements);
+  if (!page.elements.some((p) => p.id === etat.parcelle) && page.elements.length > 0) {
+    choisirParcelle(page.elements[0].id);
+  }
+  chargerApercu();
+  return page.elements;
 }
 
 function choisirParcelle(id) {
@@ -150,12 +171,155 @@ function choisirParcelle(id) {
   for (const b of $("parcelles").children) {
     b.setAttribute("aria-selected", String(Number(b.dataset.id) === id));
   }
+  for (const c of document.querySelectorAll(".carte")) {
+    c.setAttribute("aria-current", String(Number(c.dataset.id) === id));
+  }
   annulerAttente();
   $("vanne-message").textContent = "";
-  chargerRegle(id);
   ecouterFlux(id);
-  chargerHistorique();
+  // Le graphique d'humidité trace le seuil de la règle : on lit la règle d'abord
+  chargerRegle(id).then(chargerHistorique);
+  chargerJournal(id);
 }
+
+// ---------------------------------------------------------------------------
+// Vue d'ensemble : toutes les parcelles d'un coup d'œil
+// ---------------------------------------------------------------------------
+
+async function chargerApercu() {
+  let parcelles;
+  try {
+    parcelles = await api("/apercu");
+  } catch {
+    return;   // la vue détaillée reste utilisable
+  }
+  afficherApercu(parcelles);
+}
+
+// L'état d'une parcelle, du plus urgent au plus calme
+function etatParcelle(p) {
+  if (!p.en_ligne) return { genre: "alerte", texte: "Capteurs hors ligne" };
+  if (p.humidite_fiable === false) return { genre: "alerte", texte: "Capteur d'humidité en panne" };
+  if (p.vanne_etat === "ouverte") {
+    const fin = p.vanne_jusqua
+      ? ` jusqu'à ${new Intl.DateTimeFormat("fr-FR", { timeStyle: "short" }).format(new Date(p.vanne_jusqua))}`
+      : "";
+    return { genre: "arrosage", texte: `Arrosage en cours${fin}` };
+  }
+  if (p.humidite === null) return { genre: "neutre", texte: "Pas encore de mesure" };
+  if (p.seuil !== null && p.humidite < p.seuil) {
+    return { genre: "sec", texte: p.regle_active ? "Sol sec : arrosage automatique attendu" : "Sol sec, sous le seuil" };
+  }
+  return { genre: "ok", texte: "Humidité correcte" };
+}
+
+function afficherApercu(parcelles) {
+  const liste = $("apercu-liste");
+  liste.replaceChildren();
+  const compte = { arrosage: 0, sec: 0, alerte: 0 };
+
+  for (const p of parcelles) {
+    const e = etatParcelle(p);
+    if (e.genre in compte) compte[e.genre] += 1;
+
+    const carte = document.createElement("button");
+    carte.type = "button";
+    carte.className = `carte ${p.humidite_fiable === false ? "panne" : ""}`;
+    carte.dataset.id = p.id;
+    carte.setAttribute("aria-current", String(p.id === etat.parcelle));
+    carte.addEventListener("click", () => {
+      choisirParcelle(p.id);
+      document.querySelector(".sol").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    // Petite colonne de sol, comme la grande : l'eau monte jusqu'à l'humidité, le trait marque le seuil
+    const colonne = document.createElement("span");
+    colonne.className = "mini-colonne";
+    colonne.setAttribute("aria-hidden", "true");
+    const eau = document.createElement("span");
+    eau.className = "eau";
+    eau.style.height = p.humidite === null ? "0" : `${Math.min(100, Math.max(0, p.humidite))}%`;
+    colonne.append(eau);
+    if (p.seuil !== null) {
+      const trait = document.createElement("span");
+      trait.className = "seuil";
+      trait.style.bottom = `${p.seuil}%`;
+      colonne.append(trait);
+    }
+
+    const texte = document.createElement("span");
+    texte.className = "carte-texte";
+    const ligne = (classe, contenu) => Object.assign(document.createElement("span"), { className: classe, textContent: contenu });
+    const chiffre = ligne("carte-chiffre", p.humidite === null ? "–" : nombre(p.humidite, 0));
+    chiffre.append(Object.assign(document.createElement("small"), {
+      textContent: p.seuil !== null ? ` % (seuil ${nombre(p.seuil, 0)} %)` : " %",
+    }));
+    const arrosages = p.arrosages_24h === 0 ? "Aucun arrosage en 24 h"
+      : `${p.arrosages_24h} arrosage${p.arrosages_24h > 1 ? "s" : ""} en 24 h`;
+    texte.append(
+      ligne("carte-nom", p.nom),
+      ligne("carte-culture", p.culture),
+      chiffre,
+      ligne(`carte-etat ${e.genre}`, e.texte),
+      ligne("carte-arrosages", arrosages),
+    );
+
+    carte.append(colonne, texte);
+    const li = document.createElement("li");
+    li.append(carte);
+    liste.append(li);
+  }
+
+  // Une phrase qui résume, pour savoir tout de suite s'il faut agir
+  const n = parcelles.length;
+  const details = [];
+  if (compte.arrosage) details.push(`${compte.arrosage} en cours d'arrosage`);
+  if (compte.sec) details.push(`${compte.sec} sous le seuil d'arrosage`);
+  if (compte.alerte) details.push(`${compte.alerte} à vérifier (capteur en panne ou hors ligne)`);
+  $("apercu-resume").textContent = n === 0 ? ""
+    : details.length ? `${n} parcelle${n > 1 ? "s" : ""} : ${details.join(", ")}.`
+    : `${n} parcelle${n > 1 ? "s" : ""}, humidité correcte partout.`;
+}
+
+setInterval(() => { if (etat.jeton && etat.parcelle) chargerApercu(); }, 10000);
+
+// ---------------------------------------------------------------------------
+// Journal d'arrosage de la parcelle choisie
+// ---------------------------------------------------------------------------
+
+const ORIGINES = { manuelle: "Manuelle", regle: "Règle automatique", agent: "Assistant" };
+const RESULTATS = { confirmee: "Confirmé par la vanne", echec: "Pas de réponse de la vanne", envoyee: "En attente" };
+
+async function chargerJournal(id = etat.parcelle) {
+  let commandes;
+  try {
+    commandes = await api(`/parcelles/${id}/commandes?limite=20`);
+  } catch {
+    return;
+  }
+  if (id !== etat.parcelle) return;   // l'utilisateur a changé de parcelle entre-temps
+
+  const corps = $("journal-lignes");
+  corps.replaceChildren();
+  for (const c of commandes) {
+    const tr = document.createElement("tr");
+    const cellule = (contenu, classe = "") => Object.assign(document.createElement("td"), { textContent: contenu, className: classe });
+    const ordre = c.action === "ouvrir"
+      ? `Ouverture${c.duree_s ? ` ${Math.round(c.duree_s / 60)} min` : ""}`
+      : "Fermeture";
+    tr.append(
+      cellule(format.format(new Date(c.cree_le))),
+      cellule(ordre),
+      cellule(ORIGINES[c.origine] ?? c.origine, `origine-${c.origine}`),
+      cellule(RESULTATS[c.statut] ?? c.statut, `resultat-${c.statut}`),
+    );
+    corps.append(tr);
+  }
+  $("journal-vide").hidden = commandes.length > 0;
+  document.querySelector(".journal table").hidden = commandes.length === 0;
+}
+
+setInterval(() => { if (etat.jeton && etat.parcelle) chargerJournal(); }, 10000);
 
 // ---------------------------------------------------------------------------
 // Flux temps réel (SSE)
@@ -255,6 +419,8 @@ function afficherEtat({ mesures, vanne }) {
   if (attente && vanne?.derniere_cmd === attente.id) {
     annulerAttente();
     afficherMessage(`Confirmé par la vanne : ${ouverte ? "ouverte" : "fermée"}.`, "ok");
+    chargerJournal();
+    chargerApercu();
   }
 }
 
@@ -275,6 +441,7 @@ async function commander(action) {
       body: JSON.stringify(corps),
     });
     afficherMessage("Ordre envoyé, en attente de confirmation par la vanne…", "attente");
+    chargerJournal();
     etat.commandeEnAttente = {
       id: commande.id,
       minuteur: setTimeout(() => {
@@ -354,6 +521,7 @@ $("regle-bascule").addEventListener("click", async () => {
       body: JSON.stringify({ active: !etat.regle.active }),
     });
     afficherRegle();
+    chargerApercu();
   } catch (err) {
     $("regle-texte").textContent = err.message;
   }
@@ -375,6 +543,34 @@ for (const b of document.querySelectorAll(".bascule button")) {
 }
 setInterval(() => etat.parcelle && chargerHistorique(), 60000);  // rafraîchi chaque minute
 
+const NOMS_GRANDEURS = { humidite: "Humidité du sol", temperature: "Température", luminosite: "Luminosité", intensite: "Pluie" };
+const COULEUR = { eau: "#1f6fa8", terre: "#8b5e3c", alerte: "#b03a26", trait: "#e3e9e0", discret: "#5b6a5f", encre: "#1e2b22" };
+
+const POLICE = "'Atkinson Hyperlegible', system-ui, sans-serif";
+
+// Petit greffon Chart.js : écrit « Seuil 40 % » au bout de la ligne de seuil
+const etiquetteSeuil = {
+  id: "etiquetteSeuil",
+  afterDatasetsDraw(chart) {
+    const seuil = chart.options.plugins.etiquetteSeuil?.valeur;
+    if (seuil == null) return;
+    const { ctx, chartArea, scales } = chart;
+    const y = scales.y.getPixelForValue(seuil);
+    if (y < chartArea.top || y > chartArea.bottom) return;
+    const texte = `Seuil ${nombre(seuil)} %`;
+    ctx.save();
+    ctx.font = `700 12px ${POLICE}`;
+    const largeur = ctx.measureText(texte).width + 12;
+    const x = chartArea.right - largeur;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(x, y - 10, largeur, 20);
+    ctx.fillStyle = COULEUR.alerte;
+    ctx.textBaseline = "middle";
+    ctx.fillText(texte, x + 6, y);
+    ctx.restore();
+  },
+};
+
 async function chargerHistorique() {
   const grandeur = $("grandeur").value;
   let serie;
@@ -384,45 +580,224 @@ async function chargerHistorique() {
     $("historique-message").textContent = err.message;
     return;
   }
-  $("zone-graphique").hidden = serie.points.length === 0;
-  $("historique-message").textContent = serie.points.length
-    ? `Moyenne par tranche de ${serie.intervalle === "1 hour" ? "1 heure" : "6 heures"} ; la zone claire va du minimum au maximum.`
-    : "Pas encore de mesures valides sur cette période.";
+  const points = serie.points;
+  const vide = points.length === 0;
+  $("zone-graphique").hidden = vide;
+  $("historique-stats").hidden = vide;
+  const avecSeuil = grandeur === "humidite" && etat.regle !== null;
+  const decimales = grandeur === "luminosite" ? 0 : 1;
+  const unite = serie.unite;
 
-  const etiquette = (d) =>
-    new Date(d).toLocaleString("fr-FR", etat.periode === "24h"
-      ? { hour: "2-digit", minute: "2-digit" }
-      : { weekday: "short", hour: "2-digit" });
-  const donnees = {
-    labels: serie.points.map((p) => etiquette(p.debut)),
-    datasets: [
-      { label: "Maximum", data: serie.points.map((p) => p.max), borderWidth: 0, pointRadius: 0,
-        backgroundColor: "rgba(31, 111, 168, .15)", fill: "+1" },
-      { label: "Minimum", data: serie.points.map((p) => p.min), borderWidth: 0, pointRadius: 0, fill: false },
-      { label: `Moyenne (${serie.unite})`, data: serie.points.map((p) => p.moyenne),
-        borderColor: "#1f6fa8", borderWidth: 2, pointRadius: 2, tension: .3, fill: false },
-    ],
-  };
+  // Chiffres clés de la période
+  if (!vide) {
+    const moyennes = points.map((p) => p.moyenne);
+    const moyenne = moyennes.reduce((a, b) => a + b, 0) / moyennes.length;
+    const heuresTranche = serie.intervalle === "1 hour" ? 1 : 6;
+    const stats = [
+      ["Moyenne", `${nombre(moyenne, decimales)} ${unite}`],
+      ["Minimum", `${nombre(Math.min(...points.map((p) => p.min)), decimales)} ${unite}`],
+      ["Maximum", `${nombre(Math.max(...points.map((p) => p.max)), decimales)} ${unite}`],
+    ];
+    if (avecSeuil) {
+      const sous = points.filter((p) => p.moyenne < etat.seuil).length * heuresTranche;
+      stats.push(["Temps sous le seuil", `${sous} h sur ${points.length * heuresTranche} h`]);
+    }
+    const zone = $("historique-stats");
+    zone.replaceChildren(...stats.map(([nom, valeur]) => {
+      const div = document.createElement("div");
+      div.append(Object.assign(document.createElement("dt"), { textContent: nom }),
+                 Object.assign(document.createElement("dd"), { textContent: valeur }));
+      return div;
+    }));
+  }
+  $("historique-message").textContent = vide
+    ? "Pas encore de mesures valides sur cette période."
+    : `Moyenne par tranche de ${serie.intervalle === "1 hour" ? "1 heure" : "6 heures"}, avec la plage minimum–maximum en zone claire.`
+      + (avecSeuil ? " La courbe passe en brun quand le sol est sous le seuil d'arrosage." : "");
+  if (vide) return;
 
   if (!window.Chart) {
     $("historique-message").textContent = "La bibliothèque de graphiques n'a pas pu être chargée.";
     return;
   }
-  if (etat.graphique) {
-    etat.graphique.data = donnees;
-    etat.graphique.update();
-  } else {
-    etat.graphique = new Chart($("graphique"), {
-      type: "line",
-      data: donnees,
-      options: {
-        maintainAspectRatio: false,
-        animation: false,
-        interaction: { mode: "index", intersect: false },
-        plugins: { legend: { display: false } },
-        scales: { x: { grid: { display: false } }, y: { grid: { color: "#e3e9e0" } } },
+
+  const dates = points.map((p) => new Date(p.debut));
+  const etiquette = (d) => d.toLocaleString("fr-FR", etat.periode === "24h"
+    ? { hour: "2-digit", minute: "2-digit" }
+    : { weekday: "short", day: "numeric", hour: "2-digit" });
+  const sousSeuil = (ctx) => avecSeuil && (ctx.p0.parsed.y < etat.seuil || ctx.p1.parsed.y < etat.seuil);
+
+  const donnees = {
+    labels: dates.map(etiquette),
+    datasets: [
+      { label: "Maximum", data: points.map((p) => p.max), borderWidth: 0, pointRadius: 0, pointHitRadius: 0, pointHoverRadius: 0,
+        backgroundColor: "rgba(31, 111, 168, .12)", fill: "+1", tension: .35 },
+      { label: "Minimum", data: points.map((p) => p.min), borderWidth: 0, pointRadius: 0, pointHitRadius: 0, pointHoverRadius: 0,
+        fill: false, tension: .35 },
+      { label: "Moyenne", data: points.map((p) => p.moyenne), borderColor: COULEUR.eau, borderWidth: 2.5,
+        pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: COULEUR.eau, pointHoverBorderColor: "#fff",
+        pointHoverBorderWidth: 2, tension: .35, fill: false,
+        segment: { borderColor: (ctx) => (sousSeuil(ctx) ? COULEUR.terre : undefined) } },
+    ],
+  };
+  if (avecSeuil) {
+    donnees.datasets.push({ label: "Seuil", data: points.map(() => etat.seuil), borderColor: COULEUR.alerte,
+      borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0, pointHitRadius: 0, pointHoverRadius: 0, fill: false });
+  }
+
+  const options = {
+    maintainAspectRatio: false,
+    animation: false,
+    interaction: { mode: "index", intersect: false },
+    layout: { padding: { top: 8, right: 4 } },
+    plugins: {
+      legend: { display: false },
+      etiquetteSeuil: { valeur: avecSeuil ? etat.seuil : null },
+      tooltip: {
+        backgroundColor: COULEUR.encre, padding: 10, cornerRadius: 6, displayColors: false,
+        titleFont: { family: POLICE, weight: "700" }, bodyFont: { family: POLICE },
+        filter: (item) => item.dataset.label === "Moyenne",
+        callbacks: {
+          title: (items) => dates[items[0].dataIndex].toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" }),
+          label: (item) => {
+            const p = points[item.dataIndex];
+            const lignes = [
+              `${NOMS_GRANDEURS[grandeur]} moyenne : ${nombre(p.moyenne, decimales)} ${unite}`,
+              `Plage : ${nombre(p.min, decimales)} à ${nombre(p.max, decimales)} ${unite}`,
+              `${p.nombre} mesures`,
+            ];
+            if (avecSeuil) lignes.push(p.moyenne < etat.seuil ? "Sous le seuil d'arrosage" : "Au-dessus du seuil");
+            return lignes;
+          },
+        },
       },
+    },
+    scales: {
+      x: {
+        grid: { display: false }, border: { color: COULEUR.trait },
+        ticks: { color: COULEUR.discret, maxRotation: 0, autoSkipPadding: 18, font: { family: POLICE } },
+      },
+      y: {
+        grid: { color: COULEUR.trait }, border: { display: false },
+        title: { display: true, text: `${NOMS_GRANDEURS[grandeur]} (${unite})`, color: COULEUR.discret,
+                 font: { family: POLICE, size: 12 } },
+        ticks: { color: COULEUR.discret, padding: 8, font: { family: POLICE },
+                 callback: (v) => nombre(v, decimales) },
+        // Humidité : une marge de 10 points autour des valeurs et du seuil, sans sortir de 0–100 %
+        ...(grandeur === "humidite" ? {
+          min: Math.max(0, Math.floor((Math.min(...points.map((p) => p.min), avecSeuil ? etat.seuil : 100) - 10) / 10) * 10),
+          max: Math.min(100, Math.ceil((Math.max(...points.map((p) => p.max), avecSeuil ? etat.seuil : 0) + 10) / 10) * 10),
+        } : {}),
+        ...(grandeur === "intensite" || grandeur === "luminosite" ? { beginAtZero: true } : {}),
+      },
+    },
+  };
+
+  // Une nouvelle courbe à chaque changement : les options (seuil, axe, unité) changent avec la grandeur
+  etat.graphique?.destroy();
+  etat.graphique = new Chart($("graphique"), { type: "line", data: donnees, options, plugins: [etiquetteSeuil] });
+}
+
+// ---------------------------------------------------------------------------
+// Administration : créer une parcelle et l'attribuer à un exploitant
+// ---------------------------------------------------------------------------
+
+async function chargerAdmin() {
+  let comptes, parcelles;
+  try {
+    [comptes, { elements: parcelles }] = await Promise.all([api("/utilisateurs"), api("/parcelles?taille=100")]);
+  } catch (err) {
+    messageAdmin(err.message, "ko");
+    return;
+  }
+  etat.exploitants = comptes.filter((c) => c.role === "exploitant");
+  const option = (c) => Object.assign(document.createElement("option"), {
+    value: c.id, textContent: `${c.prenom} ${c.nom} (${c.courriel})`,
+  });
+
+  const choix = $("np-proprietaire");
+  const garde = choix.value;
+  choix.replaceChildren(
+    Object.assign(document.createElement("option"), { value: "", textContent: "Choisir un exploitant…" }),
+    ...etat.exploitants.map(option),
+  );
+  choix.value = garde;
+
+  const corps = $("admin-lignes");
+  corps.replaceChildren();
+  for (const p of parcelles) {
+    const tr = document.createElement("tr");
+    const cellule = (contenu) => Object.assign(document.createElement("td"), { textContent: contenu });
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", `Exploitant de la parcelle ${p.nom}`);
+    select.append(...etat.exploitants.map(option));
+    select.value = String(p.proprietaire);
+    const bouton = Object.assign(document.createElement("button"), {
+      type: "button", className: "bouton-secondaire", textContent: "Attribuer", disabled: true,
     });
+    select.addEventListener("change", () => { bouton.disabled = select.value === String(p.proprietaire); });
+    bouton.addEventListener("click", () => attribuer(p, Number(select.value)));
+    const action = document.createElement("td");
+    action.className = "attribution";
+    action.append(select, bouton);
+    tr.append(cellule(p.nom), cellule(p.culture), cellule(p.proprietaire_nom ?? "–"), action);
+    corps.append(tr);
+  }
+}
+
+function messageAdmin(texte, genre) {
+  $("admin-message").textContent = texte;
+  $("admin-message").className = `message ${genre}`;
+}
+
+// L'API demande la commune quand l'exploitant n'a pas encore d'exploitation
+const communeManquante = (err) => /commune/i.test(err.message);
+
+$("form-parcelle").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const surface = $("np-surface").value;
+  const corps = {
+    proprietaire: Number($("np-proprietaire").value),
+    nom: $("np-nom").value.trim(),
+    culture: $("np-culture").value.trim(),
+    seuil: Number($("np-seuil").value),
+    ...(surface ? { surface_m2: Number(surface) } : {}),
+    ...($("np-commune").value.trim() ? { commune: $("np-commune").value.trim() } : {}),
+  };
+  if (!corps.proprietaire) return messageAdmin("Choisissez l'exploitant à qui attribuer la parcelle.", "ko");
+  try {
+    const p = await api("/parcelles", { method: "POST", body: JSON.stringify(corps) });
+    $("form-parcelle").reset();
+    messageAdmin(`Parcelle « ${p.nom} » créée pour ${p.proprietaire_nom}. Les premières mesures arrivent dans quelques secondes.`, "ok");
+    await rafraichirParcelles();
+    chargerAdmin();
+  } catch (err) {
+    if (communeManquante(err)) {
+      $("np-commune").focus();
+      return messageAdmin("Cet exploitant n'a pas encore d'exploitation : indiquez sa commune, puis créez la parcelle.", "ko");
+    }
+    const champs = (err.corps?.erreurs || []).map((x) => x.champ.split(".").pop());
+    messageAdmin(champs.length ? `Champ à corriger : ${[...new Set(champs)].join(", ")}.` : err.message, "ko");
+  }
+});
+
+async function attribuer(parcelle, proprietaire, commune) {
+  try {
+    const p = await api(`/parcelles/${parcelle.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ proprietaire, ...(commune ? { commune } : {}) }),
+    });
+    messageAdmin(`« ${p.nom} » est maintenant attribuée à ${p.proprietaire_nom}.`, "ok");
+    await rafraichirParcelles();
+    chargerAdmin();
+  } catch (err) {
+    if (communeManquante(err) && !commune) {
+      const exploitant = etat.exploitants.find((c) => c.id === proprietaire);
+      const reponse = window.prompt(`${exploitant?.prenom ?? "Cet exploitant"} n'a pas encore d'exploitation. Dans quelle commune ?`);
+      if (reponse?.trim()) return attribuer(parcelle, proprietaire, reponse.trim());
+      return messageAdmin("Attribution annulée : la commune est nécessaire.", "ko");
+    }
+    messageAdmin(err.message, "ko");
   }
 }
 

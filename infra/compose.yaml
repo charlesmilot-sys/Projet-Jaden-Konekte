@@ -76,6 +76,7 @@ services:
       - "8000:8000"
     volumes:
       - images-data:/donnees/images     # photos des diagnostics
+      - ../api/static:/app/static:ro
     depends_on:
       db:
         condition: service_healthy

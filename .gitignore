@@ -4,6 +4,9 @@
 !.env.exemple
 infra/mosquitto/passwd
 
+# Sauvegardes de la base : contiennent les comptes et les données
+infra/sauvegarde*.sql
+
 # Python
 __pycache__/
 *.pyc

@@ -1,4 +1,4 @@
-"""Client MQTT de l'API : sert uniquement à publier les commandes de vanne."""
+"""Client MQTT de l'API : publie les commandes de vanne et l'annonce des parcelles (voir provision.py)."""
 import json
 import logging
 
@@ -23,10 +23,19 @@ def arreter() -> None:
     client.disconnect()
 
 
-def publier(topic: str, donnees: dict) -> bool:
+def publier(topic: str, donnees: dict, retenu: bool = False) -> bool:
     """Publie en QoS 1. Renvoie False si le broker n'est pas joignable."""
+    return _envoyer(topic, json.dumps(donnees), retenu)
+
+
+def publier_vide(topic: str) -> bool:
+    """Message vide retenu : efface le message retenu du topic."""
+    return _envoyer(topic, b"", True)
+
+
+def _envoyer(topic: str, contenu, retenu: bool) -> bool:
     if not client.is_connected():
         log.warning("MQTT non connecté : publication impossible sur %s", topic)
         return False
-    info = client.publish(topic, json.dumps(donnees), qos=1)
+    info = client.publish(topic, contenu, qos=1, retain=retenu)
     return info.rc == mqtt.MQTT_ERR_SUCCESS

@@ -19,3 +19,26 @@ Aucune route du contrat initial n'a été supprimée.
 | 8 | `Regle` | + `derniere_evaluation`, `derniere_decision` | Expliquer à l'exploitant pourquoi la règle arrose ou non (pluie prévue, capteur en panne…). |
 | 9 | Pas de 422 sur les lectures | 422 sur toutes les routes à paramètre de chemin ou de requête | FastAPI valide les paramètres (ex. `/parcelles/abc`) et répond 422 au format Problem Details. |
 | 10 | Pas de 503 | 503 sur `POST …/commandes`, `POST /diagnostics`, `POST /assistant/questions` | Ces routes dépendent d'un autre service (broker MQTT, service d'inférence, service assistant) qui peut être indisponible. |
+
+## Version 1.2.0 (après la soutenance)
+
+Deux routes en lecture ajoutées pour rendre le tableau de bord plus parlant, décrites dans le contrat
+avant d'être utilisées par l'interface (`test_contrat.py` vérifie toujours la concordance) :
+
+| Route | Rôle |
+|---|---|
+| `GET /api/v1/apercu` | Vue d'ensemble : pour chaque parcelle, humidité, seuil de la règle, état de la vanne et du capteur, arrosages des dernières 24 h. |
+| `GET /api/v1/parcelles/{id}/commandes` | Journal d'arrosage : ordres manuels et déclenchements de la règle, avec leur résultat. Même contrôle d'accès (404) que les autres routes d'une parcelle. |
+
+## Version 1.3.0 : administration des parcelles
+
+| Route | Rôle |
+|---|---|
+| `POST /api/v1/parcelles` | L'administrateur crée une parcelle pour un exploitant : quatre capteurs, une vanne et une règle d'arrosage sont créés avec elle. Si l'exploitant n'a pas encore d'exploitation, elle est créée (la commune est alors demandée). |
+| `PATCH /api/v1/parcelles/{id}` | L'administrateur attribue la parcelle à un autre exploitant ; elle change d'exploitation avec son équipement et son historique. |
+| `GET /api/v1/utilisateurs` | Liste des comptes, pour choisir l'exploitant. |
+
+Ces trois routes répondent 403 à un exploitant. `Parcelle` gagne `proprietaire` et `proprietaire_nom`.
+Une parcelle créée ou déplacée est annoncée en MQTT sur `jaden/<exploitation>/<parcelle>/config`
+(message retenu) : le simulateur se met à la simuler et l'ingestion recharge ses capteurs.
+

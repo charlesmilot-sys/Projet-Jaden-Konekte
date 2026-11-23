@@ -19,6 +19,9 @@ Topics (voir le sujet, § Conventions MQTT) :
     jaden/<exploitation>/<parcelle>/vanne/cmd                 commandes reçues
     jaden/<exploitation>/<parcelle>/vanne/etat                état de la vanne (retenu)
     jaden/<exploitation>/<parcelle>/statut                    online / offline (LWT, retenu)
+    jaden/<exploitation>/<parcelle>/config                    parcelle annoncée par l'API (retenu) :
+                                                              le simulateur se met à la simuler ;
+                                                              un message vide la retire
 
 Commande attendue sur .../vanne/cmd (JSON) :
     {"action": "ouvrir", "duree_s": 600, "id": "cmd-42"}   ou   {"action": "fermer", "id": "cmd-43"}
@@ -126,7 +129,8 @@ def main() -> None:
     ap.add_argument("--iterations", type=int, default=0, help="0 = infini")
     a = ap.parse_args()
 
-    parcelles = {n: Parcelle(a.exploitation, n) for n in a.parcelles}
+    # Clé : (exploitation, parcelle). Les parcelles annoncées par l'API s'ajoutent en cours de route.
+    parcelles = {(a.exploitation, n): Parcelle(a.exploitation, n) for n in a.parcelles}
     t_sim = datetime.now(timezone.utc).replace(microsecond=0)
     client = None
 
@@ -146,16 +150,38 @@ def main() -> None:
         premiere = next(iter(parcelles.values()))
         client.will_set(f"{premiere.base()}/statut", "offline", qos=1, retain=True)
 
+        def brancher(c, p: Parcelle) -> None:
+            c.subscribe(f"{p.base()}/vanne/cmd", qos=1)
+            c.publish(f"{p.base()}/statut", "online", qos=1, retain=True)
+            c.publish(f"{p.base()}/vanne/etat", etat_vanne(p, t_sim), qos=1, retain=True)
+
         def on_connect(c, userdata, flags, reason_code, properties):
             print(f"[mqtt] connecté ({reason_code})")
-            for p in parcelles.values():
-                c.subscribe(f"{p.base()}/vanne/cmd", qos=1)
-                c.publish(f"{p.base()}/statut", "online", qos=1, retain=True)
-                c.publish(f"{p.base()}/vanne/etat", etat_vanne(p, t_sim), qos=1, retain=True)
+            for p in list(parcelles.values()):
+                brancher(c, p)
+            c.subscribe("jaden/+/+/config", qos=1)
+
+        def annonce(c, expl: str, nom: str, contenu: bytes) -> None:
+            cle = (expl, nom)
+            if contenu and cle not in parcelles:
+                parcelles[cle] = p = Parcelle(expl, nom)
+                brancher(c, p)
+                print(f"[config] nouvelle parcelle simulée : {expl}/{nom}")
+            elif not contenu and cle in parcelles:
+                p = parcelles.pop(cle)
+                c.unsubscribe(f"{p.base()}/vanne/cmd")
+                c.publish(f"{p.base()}/statut", "", qos=1, retain=True)       # efface les messages retenus
+                c.publish(f"{p.base()}/vanne/etat", "", qos=1, retain=True)
+                print(f"[config] parcelle retirée : {expl}/{nom}")
 
         def on_message(c, userdata, msg):
-            nom = msg.topic.split("/")[2]
-            p = parcelles.get(nom)
+            morceaux = msg.topic.split("/")
+            if morceaux[-1] == "config":
+                annonce(c, morceaux[1], morceaux[2], msg.payload)
+                return
+            p = parcelles.get((morceaux[1], morceaux[2]))
+            if p is None:
+                return
             try:
                 cmd = json.loads(msg.payload)
                 if cmd.get("action") == "ouvrir":
@@ -182,7 +208,7 @@ def main() -> None:
         while a.iterations == 0 or n < a.iterations:
             dt_min = a.periode * a.acceleration / 60
             t_sim += timedelta(minutes=dt_min)
-            for p in parcelles.values():
+            for p in list(parcelles.values()):   # copie : une parcelle peut être annoncée entre-temps
                 avant = p.vanne_ouverte_jusqua is not None
                 res = pas_de_temps(p, t_sim, dt_min)
                 for (capteur, grandeur), (v, u) in res["mesures"].items():
@@ -195,7 +221,7 @@ def main() -> None:
         pass
     finally:
         if client is not None:
-            for p in parcelles.values():
+            for p in list(parcelles.values()):
                 client.publish(f"{p.base()}/statut", "offline", qos=1, retain=True)
             client.loop_stop()
             client.disconnect()

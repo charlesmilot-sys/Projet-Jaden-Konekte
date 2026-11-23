@@ -1,7 +1,8 @@
 """État de la vanne et commandes (ouverture / fermeture)."""
+from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app import mqtt
 from app.acces import parcelle_autorisee
@@ -28,6 +29,34 @@ async def lister_equipements(id: int, utilisateur: UtilisateurCourant):
             FROM equipement WHERE parcelle = %s ORDER BY id
             """,
             (id,),
+        )
+        return await cur.fetchall()
+
+
+@router.get(
+    "/{id}/commandes",
+    response_model=list[Commande],
+    summary="Journal des ordres envoyés à la vanne (les plus récents d'abord)",
+    description="Ordres manuels et déclenchements de la règle d'arrosage, avec leur statut.",
+    responses=reponses(401, 404, 422),
+)
+async def journal_commandes(
+    id: int,
+    utilisateur: UtilisateurCourant,
+    limite: Annotated[int, Query(ge=1, le=50)] = 15,
+):
+    async with pool.connection() as conn:
+        await parcelle_autorisee(conn, id, utilisateur)
+        cur = await conn.execute(
+            """
+            SELECT c.id, c.action, c.duree_s, c.origine, c.statut, c.cree_le
+            FROM commande c
+            JOIN equipement v ON v.id = c.equipement
+            WHERE v.parcelle = %s
+            ORDER BY c.cree_le DESC
+            LIMIT %s
+            """,
+            (id, limite),
         )
         return await cur.fetchall()
 

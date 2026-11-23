@@ -2,12 +2,18 @@ openapi: 3.1.0
 
 info:
   title: Jaden Konekté API
-  version: 1.1.0
+  version: 1.3.0
   description: |
     Suivi des jardins connectés (capteurs, arrosage, diagnostic, assistant).
 
     Version 1.1.0 : contrat initial (1.0.0, rédigé avant l'implémentation) mis à jour après comparaison
     avec la spécification générée par FastAPI. Les écarts et leurs raisons sont listés dans ecarts_contrat.md.
+
+    Version 1.2.0 : ajout de la vue d'ensemble (GET /api/v1/apercu) et du journal d'arrosage
+    (GET /api/v1/parcelles/{id}/commandes) pour le tableau de bord.
+
+    Version 1.3.0 : l'administrateur crée une parcelle équipée (POST /api/v1/parcelles), l'attribue à un
+    exploitant (PATCH /api/v1/parcelles/{id}) et liste les comptes (GET /api/v1/utilisateurs).
 
 
 servers:
@@ -60,6 +66,33 @@ paths:
           
         '422':
           $ref: '#/components/responses/DonneesInvalides'
+    post:
+      summary: Créer une parcelle équipée et l'attribuer à un exploitant (administrateur)
+      description: |
+        Crée la parcelle, ses quatre capteurs, sa vanne et une règle d'arrosage au seuil choisi, puis
+        l'annonce en MQTT (jaden/<exploitation>/<parcelle>/config) pour le simulateur et l'ingestion.
+      tags: [Parcelles]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParcelleEntree'
+      responses:
+        '201':
+          description: Parcelle créée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Parcelle'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '422':
+          $ref: '#/components/responses/DonneesInvalides'
   /api/v1/parcelles/{id}:
     get:
       summary: Détail d'une parcelle
@@ -84,7 +117,86 @@ paths:
 
         '422':
           $ref: '#/components/responses/DonneesInvalides'
+    patch:
+      summary: Attribuer la parcelle à un autre exploitant (administrateur)
+      tags: [Parcelles]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Attribution'
+      responses:
+        '200':
+          description: La parcelle, dans l'exploitation de son nouvel exploitant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Parcelle'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '422':
+          $ref: '#/components/responses/DonneesInvalides'
+  /api/v1/apercu:
+    get:
+      summary: Vue d'ensemble de mes parcelles (humidité, seuil, vanne, arrosages des dernières 24 h)
+      tags: [Tableau de bord]
+      responses:
+        '200':
+          description: Une ligne par parcelle accessible à l'utilisateur
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApercuParcelle'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '422':
+          $ref: '#/components/responses/DonneesInvalides'
   /api/v1/parcelles/{id}/commandes:
+    get:
+      summary: Journal des ordres envoyés à la vanne (les plus récents d'abord)
+      tags: [Commandes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: limite
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 15
+      responses:
+        '200':
+          description: Ordres manuels et déclenchements de la règle, avec leur statut
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Commande'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '422':
+          $ref: '#/components/responses/DonneesInvalides'
     post:
       summary: Envoyer un ordre à la vanne
       tags: [Commandes]
@@ -160,6 +272,22 @@ paths:
           $ref: '#/components/responses/DonneesInvalides'
 
   /api/v1/utilisateurs:
+    get:
+      summary: Liste des comptes (administrateur)
+      tags: [Authentification]
+      responses:
+        '200':
+          description: Tous les comptes, exploitants d'abord
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Utilisateur'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
     post:
       summary: Inscription
       tags: [Authentification]
@@ -615,6 +743,53 @@ components:
           example: tomate
         surface_m2:
           type: number
+        proprietaire:
+          type: integer
+          description: Identifiant de l'exploitant
+        proprietaire_nom:
+          type: string
+          example: Marie Joseph
+
+    ParcelleEntree:
+      type: object
+      required: [proprietaire, nom, culture]
+      properties:
+        proprietaire:
+          type: integer
+          description: Exploitant à qui la parcelle est attribuée
+        nom:
+          type: string
+          maxLength: 80
+          example: Carré de piments
+        culture:
+          type: string
+          maxLength: 30
+          example: piment
+        surface_m2:
+          type: number
+          exclusiveMinimum: 0
+        seuil:
+          type: number
+          minimum: 5
+          maximum: 70
+          default: 30
+          description: Seuil d'arrosage de la règle (humidité du sol, %)
+        commune:
+          type: string
+          maxLength: 80
+          description: Requise si l'exploitant n'a pas encore d'exploitation
+
+    Attribution:
+      type: object
+      required: [proprietaire]
+      properties:
+        proprietaire:
+          type: integer
+          description: Nouvel exploitant de la parcelle
+        commune:
+          type: string
+          maxLength: 80
+          description: Requise si l'exploitant n'a pas encore d'exploitation
 
     Probleme:
       type: object
@@ -629,6 +804,50 @@ components:
           type: integer
         detail:
           type: string
+
+    ApercuParcelle:
+      type: object
+      required: [id, code, nom, culture, en_ligne, arrosages_24h]
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+          example: p1
+        nom:
+          type: string
+        culture:
+          type: string
+        humidite:
+          type: [number, 'null']
+          description: Dernière humidité du sol valide (%)
+        humidite_ts:
+          type: [string, 'null']
+          format: date-time
+        humidite_fiable:
+          type: [boolean, 'null']
+          description: False si le capteur d'humidité est en panne
+        seuil:
+          type: [number, 'null']
+          description: Seuil d'arrosage de la règle (%), null sans règle
+        regle_active:
+          type: [boolean, 'null']
+        derniere_decision:
+          type: [string, 'null']
+        vanne_etat:
+          type: [string, 'null']
+          enum: [ouverte, fermee, null]
+        vanne_jusqua:
+          type: [string, 'null']
+          format: date-time
+        en_ligne:
+          type: boolean
+        arrosages_24h:
+          type: integer
+          description: Ouvertures confirmées sur les dernières 24 h
+        dernier_arrosage:
+          type: [string, 'null']
+          format: date-time
 
     Commande:
       type: object
@@ -928,6 +1147,12 @@ components:
 
     Introuvable:
       description: Ressource inexistante ou appartenant à un autre exploitant
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Probleme'
+    Interdit:
+      description: Action réservée à l'administrateur
       content:
         application/problem+json:
           schema:

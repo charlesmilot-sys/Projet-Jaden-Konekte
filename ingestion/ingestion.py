@@ -79,8 +79,15 @@ def lire_message(contenu: bytes) -> tuple[float, datetime]:
 def traiter(conn: psycopg.Connection, topic: str, contenu: bytes) -> None:
     """Aiguille chaque message selon son topic."""
     morceaux = topic.split("/")
+    if not contenu and morceaux[-1] != "config":
+        return   # message vide : effacement d'un message retenu (parcelle retirée), rien à enregistrer
     if len(morceaux) == 4 and morceaux[3] == "statut":
         traiter_statut(conn, morceaux[1], morceaux[2], contenu)
+    elif len(morceaux) == 4 and morceaux[3] == "config":
+        # Parcelle annoncée ou retirée par l'API : ses capteurs viennent d'être créés ou déplacés
+        log.info("Parcelle %s/%s %s : rechargement des capteurs", morceaux[1], morceaux[2],
+                 "annoncée" if contenu else "retirée")
+        charger_capteurs(conn)
     elif len(morceaux) == 5 and morceaux[3:] == ["vanne", "etat"]:
         traiter_etat_vanne(conn, morceaux[1], morceaux[2], contenu)
     elif len(morceaux) == 5:

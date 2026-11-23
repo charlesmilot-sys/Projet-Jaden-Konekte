@@ -35,6 +35,22 @@ async def inscrire(donnees: Inscription):
     return ligne
 
 
+@router.get(
+    "/utilisateurs",
+    response_model=list[Utilisateur],
+    summary="Liste des comptes (administrateur)",
+    responses=reponses(401, 403),
+)
+async def lister_utilisateurs(utilisateur: UtilisateurCourant):
+    if utilisateur.role != "administrateur":
+        raise HTTPException(403, "Réservé à l'administrateur.")
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            "SELECT id, prenom, nom, courriel, role FROM utilisateur ORDER BY role DESC, nom, prenom"
+        )
+        return await cur.fetchall()
+
+
 @router.post(
     "/jetons",
     response_model=Jeton,

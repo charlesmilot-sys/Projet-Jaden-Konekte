@@ -7,9 +7,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="app.css?v=3">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
-  <script src="app.js" defer></script>
+  <script src="app.js?v=3" defer></script>
 </head>
 <body>
 
@@ -48,10 +48,17 @@
     <header class="barre">
       <span class="marque">Jaden Konekté</span>
       <nav id="parcelles" class="onglets" aria-label="Parcelles"></nav>
+      <a id="lien-admin" href="#admin" class="bouton-secondaire lien-admin" hidden>Administration</a>
       <button id="deconnexion" class="bouton-discret">Se déconnecter</button>
     </header>
 
     <main class="tableau">
+      <section class="apercu" aria-labelledby="titre-apercu">
+        <h2 id="titre-apercu">Mes parcelles</h2>
+        <p id="apercu-resume" class="resume" role="status"></p>
+        <ul id="apercu-liste" class="apercu-liste"></ul>
+      </section>
+
       <section class="sol" aria-labelledby="titre-sol">
         <h2 id="titre-sol">Humidité du sol</h2>
         <div class="profil">
@@ -119,8 +126,73 @@
             </div>
           </div>
         </div>
+        <dl id="historique-stats" class="stats" hidden></dl>
         <div id="zone-graphique" class="graphique"><canvas id="graphique" aria-label="Historique de la grandeur choisie"></canvas></div>
         <p id="historique-message" class="discret"></p>
+      </section>
+
+      <section class="journal" aria-labelledby="titre-journal">
+        <h2 id="titre-journal">Journal d'arrosage</h2>
+        <p class="discret">Les ordres envoyés à la vanne de cette parcelle, par vous ou par la règle automatique.</p>
+        <div class="tableau-defilant">
+          <table>
+            <thead>
+              <tr><th scope="col">Date</th><th scope="col">Ordre</th><th scope="col">Origine</th><th scope="col">Résultat</th></tr>
+            </thead>
+            <tbody id="journal-lignes"></tbody>
+          </table>
+        </div>
+        <p id="journal-vide" class="discret" hidden>Aucun ordre n'a encore été envoyé à cette vanne.</p>
+      </section>
+
+      <section id="admin" class="admin" aria-labelledby="titre-admin" hidden>
+        <h2 id="titre-admin">Administration des parcelles</h2>
+        <p class="discret">Une parcelle créée ici est attribuée à un exploitant et reçoit quatre capteurs, une vanne et une règle d'arrosage. Le simulateur commence aussitôt à l'alimenter.</p>
+        <form id="form-parcelle" class="form-admin" novalidate>
+          <div class="champ large">
+            <label for="np-proprietaire">Exploitant</label>
+            <select id="np-proprietaire" required></select>
+          </div>
+          <div class="champ">
+            <label for="np-nom">Nom de la parcelle</label>
+            <input id="np-nom" type="text" maxlength="80" placeholder="Ex. : Carré de piments" required>
+          </div>
+          <div class="champ">
+            <label for="np-culture">Culture</label>
+            <input id="np-culture" type="text" maxlength="30" list="cultures" placeholder="Ex. : piment" required>
+            <datalist id="cultures">
+              <option value="tomate"><option value="igname"><option value="christophine"><option value="piment">
+              <option value="banane"><option value="madère"><option value="giraumon"><option value="patate douce">
+            </datalist>
+          </div>
+          <div class="champ">
+            <label for="np-surface">Surface (m²)</label>
+            <input id="np-surface" type="number" min="1" step="1" placeholder="Facultatif">
+          </div>
+          <div class="champ">
+            <label for="np-seuil">Seuil d'arrosage (%)</label>
+            <input id="np-seuil" type="number" min="5" max="70" step="1" value="30" required>
+          </div>
+          <div class="champ">
+            <label for="np-commune">Commune</label>
+            <input id="np-commune" type="text" maxlength="80" placeholder="Ex. : Capesterre-Belle-Eau" aria-describedby="aide-commune">
+            <small id="aide-commune" class="discret">Seulement pour la première parcelle d'un exploitant.</small>
+          </div>
+          <div class="envoi">
+            <button type="submit" class="bouton-principal">Créer la parcelle</button>
+          </div>
+        </form>
+        <p id="admin-message" class="message" role="status"></p>
+
+        <h3 class="sous-titre">Attribution des parcelles</h3>
+        <div class="tableau-defilant">
+          <table>
+            <thead>
+              <tr><th scope="col">Parcelle</th><th scope="col">Culture</th><th scope="col">Exploitant actuel</th><th scope="col">Attribuer à</th></tr>
+            </thead>
+            <tbody id="admin-lignes"></tbody>
+          </table>
+        </div>
       </section>
 
       <section class="diagnostic" aria-labelledby="titre-diagnostic">

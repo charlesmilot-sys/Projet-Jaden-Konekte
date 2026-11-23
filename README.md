@@ -23,7 +23,7 @@ la plateforme démarre avec une exploitation de démonstration et ses trois parc
 
 | Adresse | Contenu |
 |---|---|
-| <http://localhost:8000> | Tableau de bord |
+| <http://localhost:8000> | Tableau de bord : vue d'ensemble des parcelles, humidité en direct, vanne, historique avec le seuil d'arrosage, journal d'arrosage, diagnostic, assistant |
 | <http://localhost:8000/docs> | Documentation interactive de l'API |
 
 Comptes :
@@ -34,6 +34,9 @@ Comptes :
 | Administrateur (voit toutes les parcelles) | `ADMIN_COURRIEL` du fichier `.env` | `ADMIN_MOT_DE_PASSE` du fichier `.env` |
 
 N'importe qui peut aussi s'inscrire (`POST /api/v1/utilisateurs`) : il obtient un compte exploitant sans parcelle.
+L'administrateur lui crée ensuite une parcelle, ou lui en attribue une existante, depuis la section
+« Administration des parcelles » du tableau de bord : la parcelle reçoit quatre capteurs, une vanne et une
+règle d'arrosage, et le simulateur commence aussitôt à l'alimenter.
 
 ### Variables d'environnement (`infra/.env`)
 
@@ -63,7 +66,7 @@ Les principaux flux :
 |---|---|---|
 | `mqtt` | `infra/mosquitto` | Broker Mosquitto : comptes par service et ACL |
 | `db` | `infra/sql` | PostgreSQL 16, TimescaleDB (hypertable `mesure`), pgvector (table `passage`) |
-| `simulateur` | `simulateur` | Trois parcelles simulées (capteurs, vanne, pannes volontaires), temps accéléré ×60 |
+| `simulateur` | `simulateur` | Parcelles simulées (les trois de démonstration, puis celles créées par l'administrateur) : capteurs, vanne, pannes volontaires, temps accéléré ×60 |
 | `ingestion` | `ingestion` | Abonné à `jaden/#` : validation des mesures, confirmation des commandes, statut des objets |
 | `regles` | `regles` | Vérifie la règle de chaque parcelle toutes les 30 s (humidité du sol + pluie prévue) |
 | `api` | `api` | API REST (JWT, Problem Details), flux SSE, tableau de bord (`api/static`) |
@@ -85,7 +88,7 @@ cd infra
 docker compose --profile tests run --rm tests
 ```
 
-37 tests : validation des mesures, règle d'arrosage, prétraitement des images, découpage des fiches
+39 tests : validation des mesures, règle d'arrosage, prétraitement des images, découpage des fiches
 (tests unitaires) ; authentification, contrôle d'accès, diagnostic et conformité au contrat OpenAPI
 (tests de bout en bout sur l'API en marche).
 
